@@ -11,6 +11,8 @@
   "dependencies": {
     "@pkmn/client": "^0.6.31",
     "@pkmn/data": "^0.9.31",
+    "@pkmn/dex": "^0.9.31",
+    "@pkmn/img": "^0.2.36",
     "@pkmn/protocol": "^0.6.31",
     "@pkmn/randoms": "^0.9.31",
     "@pkmn/sets": "^5.1.2",
@@ -22,11 +24,12 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@biomejs/biome": "1.9.4",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
