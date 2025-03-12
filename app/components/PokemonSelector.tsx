@@ -1,58 +1,67 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Generations } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
 import { Sprites } from "@pkmn/img";
-import { GENERATION } from "@/lib/constants";
+import { GENERATION, TYPE_COLORS } from "@/lib/constants";
 import { getRandomMovesForPokemon } from "../utils/pokemonUtils";
-import Pokemon from "./Pokemon";
+import PokemonCard from "./PokemonCard";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
+import { useBattleStore } from "../store/battle-store";
+import type { Species, TypeName } from "@pkmn/dex";
 
-type PokemonSelectorProps = {
-	onSelect: (pokemon: string, moves: string[]) => void;
-};
-
-type PokemonData = {
-	id: string;
-	name: string;
+export type PokemonData = Species & {
 	sprite: string;
-	moves: string[];
 };
 
 /**
- * Component for selecting a single Pokemon from Gen 1
+ * Component for selecting a single Pokemon
  */
-export default function PokemonSelector({ onSelect }: PokemonSelectorProps) {
+export default function PokemonSelector() {
+	const { setSelectedPokemon, setSelectedMoves, selectedMoves } =
+		useBattleStore();
 	const [allPokemon, setAllPokemon] = useState<PokemonData[]>([]);
-	const [selectedPokemon, setSelectedPokemon] = useState<string>("");
-	const [selectedMoves, setSelectedMoves] = useState<string[]>([]);
+	const [selectedPokemonId, setSelectedPokemonId] = useState<string>("");
 	const [isLoading, setIsLoading] = useState(true);
 	const [isLoadingMoves, setIsLoadingMoves] = useState(false);
+
+	// Memoize the sorted Pokemon list
+	const sortedPokemon = useMemo(() => {
+		return [...allPokemon].sort((a, b) => a.num - b.num);
+	}, [allPokemon]);
 
 	useEffect(() => {
 		// Initialize the generations using the Dex
 		const fetchPokemonData = async () => {
 			try {
 				const gens = new Generations(Dex);
-
 				const gen = gens.get(GENERATION);
 
-				// Get all Pokemon
-				const pokemonList = Array.from(gen.species)
-					.map((species) => {
-						// Get sprite URL using @pkmn/img
-						const spriteUrl = Sprites.getPokemon(species.name, {
-							gen: GENERATION,
-						}).url;
+				// Get all Pokemon from Gen 1
+				const pokemonList = Array.from(gen.species).map((species) => {
+					// Get sprite URL using @pkmn/img
+					const spriteUrl = Sprites.getPokemon(species.name, {
+						gen: GENERATION,
+						side: "p2",
+					}).url;
 
-						return {
-							id: species.id,
-							name: species.name,
-							sprite: spriteUrl,
-							moves: [],
-						};
-					})
+					return {
+						...species,
+						sprite: spriteUrl,
+					};
+				});
 
-					.sort((a, b) => a.name.localeCompare(b.name));
-
+				// @ts-ignore
 				setAllPokemon(pokemonList);
 				setIsLoading(false);
 			} catch (error) {
@@ -64,96 +73,129 @@ export default function PokemonSelector({ onSelect }: PokemonSelectorProps) {
 		fetchPokemonData();
 	}, []);
 
-	const getRandomMoves = async (pokemonId: string) => {
-		try {
-			const moves = await getRandomMovesForPokemon(pokemonId);
+	const getRandomMoves = useCallback(
+		async (pokemonId: string) => {
+			setIsLoadingMoves(true);
+			try {
+				const moves = await getRandomMovesForPokemon(pokemonId);
+				const pokemon = allPokemon.find((p) => p.id === pokemonId);
 
-			setSelectedMoves(moves);
-			onSelect(pokemonId, moves);
-			setIsLoadingMoves(false);
-		} catch (error) {
-			console.error("Error getting moves:", error);
-			setSelectedMoves([]);
-			onSelect(pokemonId, []);
-			setIsLoadingMoves(false);
-		}
-	};
+				if (pokemon) {
+					setSelectedMoves(moves);
+					setSelectedPokemon(pokemon);
+				}
+			} catch (error) {
+				console.error("Error getting moves:", error);
+				setSelectedMoves([]);
+				setSelectedPokemon(null);
+			} finally {
+				setIsLoadingMoves(false);
+			}
+		},
+		[allPokemon, setSelectedMoves, setSelectedPokemon],
+	);
 
-	const handleSelectChange = async (
-		e: React.ChangeEvent<HTMLSelectElement>,
-	) => {
-		const pokemonId = e.target.value;
-		setSelectedPokemon(pokemonId);
+	const handleSelectChange = useCallback(
+		async (value: string) => {
+			setSelectedPokemonId(value);
 
-		if (pokemonId) {
-			await getRandomMoves(pokemonId);
-		} else {
-			setSelectedMoves([]);
-			onSelect("", []);
-		}
-	};
+			if (value) {
+				await getRandomMoves(value);
+			} else {
+				setSelectedMoves([]);
+				setSelectedPokemon(null);
+			}
+		},
+		[getRandomMoves, setSelectedMoves, setSelectedPokemon],
+	);
 
 	if (isLoading) {
-		return <div className="p-4 text-center">Loading Pokemon data...</div>;
+		return (
+			<div className="flex items-center justify-center p-4">
+				<Loader2 className="h-6 w-6 animate-spin" />
+				<span className="ml-2">Loading Pokemon data...</span>
+			</div>
+		);
 	}
 
 	// Find the selected Pokemon object
-	const selectedPokemonData = selectedPokemon
-		? allPokemon.find((p) => p.id === selectedPokemon)
+	const selectedPokemonData = selectedPokemonId
+		? allPokemon.find((p) => p.id === selectedPokemonId)
 		: null;
 
 	return (
-		<div className="w-full p-4">
-			<div className="mb-6">
-				<label
-					htmlFor="pokemon-select"
-					className="block text-sm font-medium mb-2"
-				>
-					Select a Pokemon
-				</label>
-
-				<div className="relative">
-					<select
-						id="pokemon-select"
-						value={selectedPokemon}
-						onChange={handleSelectChange}
-						className="block w-full rounded-md border border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-						disabled={isLoading}
-					>
-						<option value="">Select a Pokemon...</option>
-						{allPokemon.map((pokemon) => (
-							<option key={pokemon.id} value={pokemon.id}>
-								{pokemon.name.replace(/-/g, " ")}
-							</option>
+		<div className="w-full space-y-6">
+			<Select value={selectedPokemonId} onValueChange={handleSelectChange}>
+				<SelectTrigger className="w-full">
+					<SelectValue placeholder="Select a Pokemon..." />
+				</SelectTrigger>
+				<SelectContent className="max-h-[300px]">
+					<ScrollArea className="h-[300px]">
+						{sortedPokemon.map((pokemon) => (
+							<SelectItem
+								key={pokemon.id}
+								value={pokemon.id}
+								className="flex items-center gap-2 py-2 hover:bg-accent/50 transition-colors"
+							>
+								<img
+									src={pokemon.sprite}
+									alt={pokemon.name}
+									className="w-10 h-10 object-contain"
+									loading="lazy"
+								/>
+								<span className="text-sm text-muted-foreground mr-1">
+									#{pokemon.num.toString().padStart(3, "0")}
+								</span>
+								<span className="font-medium capitalize">
+									{pokemon.name.replace(/-/g, " ")}
+								</span>
+								<div className="flex gap-1 ml-auto">
+									{pokemon.types.map((type) => (
+										<Badge
+											key={type}
+											variant="secondary"
+											className={`${TYPE_COLORS[type]} text-white text-xs px-2 py-0`}
+										>
+											{type}
+										</Badge>
+									))}
+								</div>
+							</SelectItem>
 						))}
-					</select>
-				</div>
-			</div>
+					</ScrollArea>
+				</SelectContent>
+			</Select>
 
 			{selectedPokemonData && (
-				<div className="mt-6">
-					{/* Use the Pokemon component to display the selected Pokemon with moves */}
-					<Pokemon
-						pokemon={{
-							id: selectedPokemonData.id,
-							name: selectedPokemonData.name,
-							sprite: selectedPokemonData.sprite,
-							moves: selectedMoves,
-						}}
-						className="mb-4"
-						showMoves={true}
-						disabledMoves={isLoadingMoves}
-					/>
+				<Card className="overflow-hidden border-2">
+					<CardContent className="pt-6">
+						<PokemonCard
+							pokemon={{
+								pokemon: selectedPokemonData,
+								moves: selectedMoves,
+							}}
+							className="mb-4"
+							showMoves={true}
+							disabledMoves={isLoadingMoves}
+						/>
 
-					<button
-						type="button"
-						onClick={() => getRandomMoves(selectedPokemon)}
-						className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-						disabled={isLoadingMoves || !selectedPokemon}
-					>
-						Regenerate Moves
-					</button>
-				</div>
+						<Button
+							onClick={() => getRandomMoves(selectedPokemonId)}
+							disabled={isLoadingMoves || !selectedPokemonId}
+							variant="secondary"
+							className="w-full mt-4"
+						>
+							{isLoadingMoves ? (
+								<>
+									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+									Generating moves...
+								</>
+							) : (
+								"Regenerate Moves"
+							)}
+						</Button>
+					</CardContent>
+				</Card>
 			)}
 		</div>
 	);

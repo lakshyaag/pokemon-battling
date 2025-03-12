@@ -1,11 +1,10 @@
 import { GENERATION } from "@/lib/constants";
 import { Generations } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
+import type { PokemonData } from "../components/PokemonSelector";
 
 export type PokemonWithMoves = {
-	id: string;
-	name: string;
-	sprite: string;
+	pokemon: PokemonData;
 	moves: string[];
 };
 
@@ -27,9 +26,8 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 	const moves = await getRandomMovesForPokemon(randomPokemon.id);
 
 	return {
-		id: randomPokemon.id,
-		name: randomPokemon.name,
-		sprite: "", // Will be populated in the component
+		// @ts-ignore
+		pokemon: randomPokemon,
 		moves,
 	};
 }
