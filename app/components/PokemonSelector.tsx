@@ -50,6 +50,7 @@ export default function PokemonSelector({ onSelect }: PokemonSelectorProps) {
 							moves: [],
 						};
 					})
+
 					.sort((a, b) => a.name.localeCompare(b.name));
 
 				setAllPokemon(pokemonList);

@@ -1,1 +1,1 @@
-export const GENERATION = 3;
+export const GENERATION = 1;
