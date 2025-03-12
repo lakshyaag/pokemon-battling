@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Generations } from "@pkmn/data";
+import { Generations, type Specie } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
 import { Sprites } from "@pkmn/img";
 import { GENERATION, TYPE_COLORS } from "@/lib/constants";
@@ -13,14 +13,14 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Loader2, Swords } from "lucide-react";
 import { useBattleStore } from "../store/battle-store";
-import type { Species, TypeName } from "@pkmn/dex";
+import { useRouter } from "next/navigation";
 
-export type PokemonData = Species & {
+export type PokemonData = Specie & {
 	sprite: string;
 };
 
@@ -28,12 +28,20 @@ export type PokemonData = Species & {
  * Component for selecting a single Pokemon
  */
 export default function PokemonSelector() {
-	const { setSelectedPokemon, setSelectedMoves, selectedMoves } =
-		useBattleStore();
+	const router = useRouter();
+	const { 
+		setSelectedPokemon, 
+		setSelectedMoves, 
+		selectedMoves,
+		selectedPokemon,
+		setOpponentPokemon,
+		setOpponentMoves,
+	} = useBattleStore();
 	const [allPokemon, setAllPokemon] = useState<PokemonData[]>([]);
 	const [selectedPokemonId, setSelectedPokemonId] = useState<string>("");
 	const [isLoading, setIsLoading] = useState(true);
 	const [isLoadingMoves, setIsLoadingMoves] = useState(false);
+	const [isStartingBattle, setIsStartingBattle] = useState(false);
 
 	// Memoize the sorted Pokemon list
 	const sortedPokemon = useMemo(() => {
@@ -77,8 +85,11 @@ export default function PokemonSelector() {
 		async (pokemonId: string) => {
 			setIsLoadingMoves(true);
 			try {
-				const moves = await getRandomMovesForPokemon(pokemonId);
 				const pokemon = allPokemon.find((p) => p.id === pokemonId);
+				if (!pokemon) {
+					throw new Error(`Pokemon ${pokemonId} not found`);
+				}
+				const moves = await getRandomMovesForPokemon(pokemon);
 
 				if (pokemon) {
 					setSelectedMoves(moves);
@@ -108,6 +119,31 @@ export default function PokemonSelector() {
 		},
 		[getRandomMoves, setSelectedMoves, setSelectedPokemon],
 	);
+
+	const handleStartBattle = useCallback(async () => {
+		if (!selectedPokemon) return;
+		
+		setIsStartingBattle(true);
+		try {
+			// Select a random opponent
+			const availablePokemon = allPokemon.filter(p => p.id !== selectedPokemon.id);
+			const randomOpponent = availablePokemon[Math.floor(Math.random() * availablePokemon.length)];
+			
+			// Get moves for the opponent
+			const opponentMoves = await getRandomMovesForPokemon(randomOpponent);
+			
+			// Set opponent data
+			setOpponentPokemon(randomOpponent);
+			setOpponentMoves(opponentMoves);
+			
+			// Navigate to battle page
+			router.push("/battle");
+		} catch (error) {
+			console.error("Error starting battle:", error);
+		} finally {
+			setIsStartingBattle(false);
+		}
+	}, [selectedPokemon, allPokemon, router, setOpponentPokemon, setOpponentMoves]);
 
 	if (isLoading) {
 		return (
@@ -179,21 +215,42 @@ export default function PokemonSelector() {
 							disabledMoves={isLoadingMoves}
 						/>
 
-						<Button
-							onClick={() => getRandomMoves(selectedPokemonId)}
-							disabled={isLoadingMoves || !selectedPokemonId}
-							variant="secondary"
-							className="w-full mt-4"
-						>
-							{isLoadingMoves ? (
-								<>
-									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-									Generating moves...
-								</>
-							) : (
-								"Regenerate Moves"
-							)}
-						</Button>
+						<div className="flex gap-4">
+							<Button
+								onClick={() => getRandomMoves(selectedPokemonId)}
+								disabled={isLoadingMoves || !selectedPokemonId}
+								variant="secondary"
+								className="flex-1"
+							>
+								{isLoadingMoves ? (
+									<>
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										Generating moves...
+									</>
+								) : (
+									"Regenerate Moves"
+								)}
+							</Button>
+
+							<Button
+								onClick={handleStartBattle}
+								disabled={isStartingBattle || !selectedPokemonId || !selectedMoves.length}
+								variant="default"
+								className="flex-1"
+							>
+								{isStartingBattle ? (
+									<>
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										Starting battle...
+									</>
+								) : (
+									<>
+										<Swords className="mr-2 h-4 w-4" />
+										Start Battle
+									</>
+								)}
+							</Button>
+						</div>
 					</CardContent>
 				</Card>
 			)}

@@ -1,5 +1,5 @@
 import { GENERATION } from "@/lib/constants";
-import { Generations } from "@pkmn/data";
+import { Generations, type Specie } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
 import type { PokemonData } from "../components/PokemonSelector";
 
@@ -23,7 +23,7 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 	const randomPokemon = allPokemon[randomIndex];
 
 	// Get random moves for this Pokemon
-	const moves = await getRandomMovesForPokemon(randomPokemon.id);
+	const moves = await getRandomMovesForPokemon(randomPokemon);
 
 	return {
 		// @ts-ignore
@@ -36,17 +36,11 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
  * Get random moves for a specific Pokemon
  */
 export async function getRandomMovesForPokemon(
-	pokemonId: string,
+	pokemon: Specie,
 ): Promise<string[]> {
 	try {
 		const gens = new Generations(Dex);
 		const gen = gens.get(GENERATION);
-
-		// Get learnset data for the Pokemon
-		const pokemon = gen.species.get(pokemonId);
-		if (!pokemon) {
-			throw new Error(`Pokemon ${pokemonId} not found`);
-		}
 
 		// Wait for the learnsets data to load
 		const learnsets = await gen.learnsets.get(pokemon.id);
@@ -55,7 +49,7 @@ export async function getRandomMovesForPokemon(
 			throw new Error(`No learnset data found for ${pokemon.name}`);
 		}
 
-		// Get all moves for this Pokemon in Gen 1
+		// Get all moves for this Pokemon
 		const availableMoves: string[] = [];
 
 		for (const moveId in learnsets.learnset) {
