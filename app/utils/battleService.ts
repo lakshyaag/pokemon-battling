@@ -1,515 +1,474 @@
-import { Generations, type PokemonSet } from "@pkmn/data";
-import {
-	BattleStreams,
-	Teams as DTeams,
-	PRNG,
-	Dex,
-	RandomPlayerAI,
-} from "@pkmn/sim";
-import { Protocol } from "@pkmn/protocol";
-import { GENERATION } from "@/lib/constants";
-import { TeamGenerators } from "@pkmn/randoms";
-import type { PokemonWithMoves } from "./pokemonUtils";
+import { Battle, type Pokemon, Side } from '@pkmn/client';
+import { type GenerationNum, Generations } from '@pkmn/data';
+import { type GraphicsGen, Icons, Sprites } from '@pkmn/img';
+import { type ArgName, type ArgType, type BattleArgsKWArgType, Handler, Protocol } from '@pkmn/protocol';
+import { TeamGenerators } from '@pkmn/randoms';
+import { Teams } from '@pkmn/sets';
+import { BattleStreams, Teams as DTeams, Dex, type ModdedDex, PRNG } from '@pkmn/sim';
+import type { ObjectReadWriteStream } from '@pkmn/streams';
+import { LogFormatter } from '@pkmn/view';
+import type { BattleRequest } from '../components/BattleComponent';
 
-// Initialize team generators - this is required for proper battle simulation
-DTeams.setGeneratorFactory(TeamGenerators);
-
-export type BattleResult = {
-	move: string;
-	user: string;
-	target: string;
-	damage?: number;
-	effectiveness?: "super" | "resisted" | "immune" | "neutral";
-	critical?: boolean;
-	message: string;
-};
-
-export type BattleState = {
-	inProgress: boolean;
-	turn: number;
-	playerPokemon: {
-		name: string;
-		hp: number;
-		maxHp: number;
-		status?: string;
-	};
-	opponentPokemon: {
-		name: string;
-		hp: number;
-		maxHp: number;
-		status?: string;
-	};
-	lastResults: BattleResult[];
-	winner: "player" | "opponent" | null;
-};
-
-// Type guard for KWArgs to check properties
-function hasProperty<K extends string>(
-	obj: Record<string, unknown>,
-	prop: K,
-): obj is Record<K, unknown> {
-	return Object.prototype.hasOwnProperty.call(obj, prop);
+/**
+ * Interface for battle options
+ */
+interface BattleOptions {
+	format: string;
+	p1Name: string;
+	p2Name: string;
+	p1Team?: string;
+	p2Team?: string;
+	onBattleUpdate?: (state: BattleState) => void;
 }
 
 /**
- * Service to handle battle creation and progression using Pokemon Showdown's Battle Simulator
- * Follows the protocol described in https://github.com/smogon/pokemon-showdown/blob/master/sim/SIMULATOR.md
+ * Interface for battle state
  */
-export class BattleService {
-	private stream: ReturnType<typeof BattleStreams.getPlayerStreams>;
-	private state: BattleState;
-	private battleStarted = false;
-	private resolveUpdate: ((value: BattleState) => void) | null = null;
-	private readonly prng: PRNG;
+interface BattleState {
+	turn: number;
+	p1: {
+		active: Pokemon | null;
+		team: Pokemon[];
+		request: BattleRequest | null;
+	};
+	p2: {
+		active: Pokemon | null;
+		team: Pokemon[];
+		request: BattleRequest | null;
+	};
+	weather: string;
+	status: string;
+	logs: string[];
+}
+
+/**
+ * Class representing a manual player in a Pokémon battle
+ */
+class ManualPlayer {
+	stream: ObjectReadWriteStream<string>;
+	log: string[] = [];
+	debug: boolean;
+	currentRequest: BattleRequest | null = null;
+	playerName: string;
+	onRequestReceived: (request: BattleRequest) => void;
 
 	/**
-	 * Creates a new battle service
+	 * Create a manual player
+	 * @param playerStream - The player's stream
+	 * @param debug - Whether to enable debug logging
+	 * @param playerName - The player's name
+	 * @param onRequestReceived - Callback for when a request is received
 	 */
 	constructor(
-		userPokemon: PokemonWithMoves,
-		opponentPokemon: PokemonWithMoves,
+		playerStream: ObjectReadWriteStream<string>,
+		debug = false,
+		playerName = 'Unknown',
+		onRequestReceived: (request: BattleRequest) => void = () => { }
 	) {
-		this.stream = BattleStreams.getPlayerStreams(
-			new BattleStreams.BattleStream(),
+		this.stream = playerStream;
+		this.debug = debug;
+		this.playerName = playerName;
+		this.onRequestReceived = onRequestReceived;
+
+		void this.startListening();
+	}
+
+	/**
+	 * Start listening to the stream
+	 */
+	async startListening(): Promise<void> {
+		try {
+			for await (const chunk of this.stream) {
+				this.receive(chunk);
+			}
+		} catch (error) {
+			console.error(`${this.playerName} stream error:`, error);
+		}
+	}
+
+	/**
+	 * Receive a chunk of data from the stream
+	 * @param chunk - The data chunk
+	 */
+	receive(chunk: string): void {
+		if (this.debug) console.log(`${this.playerName} received:`, chunk);
+
+		for (const line of chunk.split('\n')) {
+			this.receiveLine(line);
+		}
+	}
+
+	/**
+	 * Receive a line of data
+	 * @param line - The data line
+	 */
+	receiveLine(line: string): void {
+		if (this.debug) console.log(`${this.playerName} line:`, line);
+		if (!line.startsWith('|')) return;
+
+		const [cmd, rest] = line.slice(1).split('|', 1)[0] === ''
+			? ['', line.slice(1)]
+			: [line.slice(1).split('|', 1)[0], line.slice(line.indexOf('|', 1) + 1)];
+
+		if (cmd === 'request') {
+			try {
+				const request = JSON.parse(rest);
+				this.receiveRequest(request);
+			} catch (e) {
+				console.error(`${this.playerName} error parsing request:`, e, rest);
+			}
+			return;
+		}
+
+		if (cmd === 'error') {
+			this.receiveError(new Error(rest));
+			return;
+		}
+
+		this.log.push(line);
+	}
+
+	/**
+	 * Handle an error
+	 * @param error - The error
+	 */
+	receiveError(error: Error): void {
+		console.error(`${this.playerName} battle error:`, error);
+
+		// If we made an unavailable choice we will receive a followup request to
+		// allow us the opportunity to correct our decision.
+		if (error.message.startsWith('[Unavailable choice]')) return;
+	}
+
+	/**
+	 * Handle a request
+	 * @param request - The request
+	 */
+	receiveRequest(request: BattleRequest): void {
+		this.currentRequest = request;
+		if (this.debug) console.log(`${this.playerName} received request:`, request);
+		this.onRequestReceived(request);
+	}
+
+	/**
+	 * Make a move
+	 * @param moveIndex - The move index (1-based)
+	 */
+	makeMove(moveIndex: number): void {
+		this.makeChoice(`move ${moveIndex}`);
+	}
+
+	/**
+	 * Make a choice
+	 * @param choice - The choice string
+	 */
+	makeChoice(choice: string): void {
+		console.log(`${this.playerName} making choice: ${choice}`);
+		try {
+			void this.stream.write(choice);
+		} catch (error) {
+			console.error(`${this.playerName} error making choice:`, error);
+		}
+	}
+}
+
+/**
+ * Class for handling Pokémon battles
+ */
+export class BattleService {
+	private battle: Battle;
+	private streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
+	private p1: ManualPlayer;
+	private p2: ManualPlayer;
+	private formatter: LogFormatter;
+	private prng: PRNG;
+	private dex: ModdedDex;
+	private gens: Generations;
+	private format: string;
+	private battleState: BattleState;
+	private onBattleUpdate: (state: BattleState) => void;
+
+	/**
+	 * Create a battle service
+	 * @param options - The battle options
+	 */
+	constructor(options: BattleOptions) {
+		this.format = options.format || 'gen3randombattle';
+		this.prng = new PRNG();
+		this.dex = Dex.forFormat(this.format);
+		// @ts-ignore
+		this.gens = new Generations(Dex);
+		this.onBattleUpdate = options.onBattleUpdate || (() => { });
+
+		// Set up team generators
+		DTeams.setGeneratorFactory(TeamGenerators);
+
+		// Initialize battle state
+		this.battleState = {
+			turn: 0,
+			p1: { active: null, team: [], request: null },
+			p2: { active: null, team: [], request: null },
+			weather: 'none',
+			status: 'Initializing battle...',
+			logs: []
+		};
+
+		// Create battle streams
+		this.streams = BattleStreams.getPlayerStreams(new BattleStreams.BattleStream());
+
+		// Create battle instance
+		this.battle = new Battle(this.gens);
+
+		// Create formatter
+		this.formatter = new LogFormatter('p1', this.battle);
+
+		// Create players
+		this.p1 = new ManualPlayer(
+			this.streams.p1,
+			true,
+			options.p1Name || 'Player 1',
+			(request) => this.handlePlayerRequest('p1', request)
 		);
 
-		this.prng = new PRNG(); // Create a new PRNG for more realistic randomness
+		this.p2 = new ManualPlayer(
+			this.streams.p2,
+			true,
+			options.p2Name || 'Player 2',
+			(request) => this.handlePlayerRequest('p2', request)
+		);
 
-		// We don't need to create RandomPlayerAI instances since we'll be controlling moves manually
-		// const p1 = new RandomPlayerAI(this.stream.p1);
-		// const p2 = new RandomPlayerAI(this.stream.p2);
-
-		this.state = {
-			inProgress: false,
-			turn: 0,
-			playerPokemon: {
-				name: userPokemon.name,
-				hp: 0,
-				maxHp: 0,
-			},
-			opponentPokemon: {
-				name: opponentPokemon.name,
-				hp: 0,
-				maxHp: 0,
-			},
-			lastResults: [],
-			winner: null,
-		};
-
-		// Process the battle output
-		void this.processBattleStream();
+		// Start listening to the omniscient stream
+		this.startBattleStream();
 	}
 
 	/**
-	 * Process the battle stream output
+	 * Start the battle stream
 	 */
-	private async processBattleStream() {
+	private async startBattleStream(): Promise<void> {
 		try {
-			for await (const chunk of this.stream.omniscient) {
-				console.log("Battle stream chunk:", chunk); // Debug logging
-				this.processBattleMessage(chunk);
-			}
-		} catch (error) {
-			console.error("Error processing battle stream:", error);
-			// Ensure we resolve any pending updates on error
-			if (this.resolveUpdate) {
-				this.resolveUpdate({ ...this.state });
-				this.resolveUpdate = null;
-			}
-		}
-	}
+			for await (const chunk of this.streams.omniscient) {
+				for (const line of chunk.split('\n')) {
+					const { args, kwArgs } = Protocol.parseBattleLine(line);
+					const key = Protocol.key(args);
 
-	/**
-	 * Process battle message from the stream
-	 */
-	private processBattleMessage(chunk: string) {
-		const lines = chunk.split("\n");
+					// Pre-processing
+					this.preProcess(key, args, kwArgs);
 
-		for (const line of lines) {
-			if (!line.trim()) continue;
+					// Update battle state
+					this.battle.add(args, kwArgs);
 
-			console.log("Processing line:", line); // Debug logging
+					// Post-processing
+					this.postProcess(key, args, kwArgs);
 
-			try {
-				const { args, kwArgs } = Protocol.parseBattleLine(line);
-
-				if (!args) continue;
-
-				const command = args[0];
-
-				switch (command) {
-					case "turn": {
-						const turn = Number.parseInt(args[1], 10);
-						this.state.turn = turn;
-						this.state.inProgress = true;
-						console.log(`Turn ${turn} started`); // Debug logging
-						break;
-					}
-					case "win": {
-						const winner = args[1];
-						this.state.winner = winner === "Player" ? "player" : "opponent";
-						this.state.inProgress = false;
-						console.log(`Winner: ${winner}`); // Debug logging
-						break;
-					}
-					case "move": {
-						const [_, pokemon, move] = args;
-						const isPlayer = pokemon.startsWith("p1");
-
-						const result: BattleResult = {
-							move,
-							user: isPlayer ? "player" : "opponent",
-							target: isPlayer ? "opponent" : "player",
-							message: `${pokemon.split(": ")[1]} used ${move}!`,
-						};
-
-						// Use type guards for kwArgs properties
-						if (hasProperty(kwArgs, "crit")) {
-							result.critical = true;
-							result.message += " A critical hit!";
-						}
-
-						if (hasProperty(kwArgs, "supereffective")) {
-							result.effectiveness = "super";
-							result.message += " It's super effective!";
-						} else if (hasProperty(kwArgs, "resisted")) {
-							result.effectiveness = "resisted";
-							result.message += " It's not very effective...";
-						} else if (hasProperty(kwArgs, "immune")) {
-							result.effectiveness = "immune";
-							result.message += " It doesn't affect the opponent...";
-						} else {
-							result.effectiveness = "neutral";
-						}
-
-						this.state.lastResults.push(result);
-						console.log(`Move used: ${move}`); // Debug logging
-						break;
-					}
-					case "-damage": {
-						const [_, pokemon, hpInfo] = args;
-						const isPlayer = pokemon.startsWith("p1");
-						const [hp, maxHp] = this.parseHPString(hpInfo);
-
-						if (isPlayer) {
-							this.state.playerPokemon.hp = hp;
-							this.state.playerPokemon.maxHp = maxHp;
-						} else {
-							this.state.opponentPokemon.hp = hp;
-							this.state.opponentPokemon.maxHp = maxHp;
-						}
-
-						if (this.state.lastResults.length > 0) {
-							const lastResult =
-								this.state.lastResults[this.state.lastResults.length - 1];
-							if (lastResult.target === (isPlayer ? "player" : "opponent")) {
-								lastResult.damage = Math.max(0, lastResult.damage ?? 0);
-							}
-						}
-						console.log(
-							`Damage to ${isPlayer ? "player" : "opponent"}: HP = ${hp}/${maxHp}`,
-						); // Debug logging
-						break;
-					}
-					case "faint": {
-						const [_, pokemon] = args;
-						const isPlayer = pokemon.startsWith("p1");
-
-						if (isPlayer) {
-							this.state.playerPokemon.hp = 0;
-						} else {
-							this.state.opponentPokemon.hp = 0;
-						}
-						console.log(`${isPlayer ? "Player" : "Opponent"} fainted`); // Debug logging
-						break;
-					}
-					case "poke": {
-						const [_, player, pokemonStr] = args;
-						const isPlayer = player === "p1";
-						const name = pokemonStr.split(",")[0];
-
-						if (isPlayer) {
-							this.state.playerPokemon.name = name;
-						} else {
-							this.state.opponentPokemon.name = name;
-						}
-						console.log(
-							`Pokemon added: ${name} for ${isPlayer ? "player" : "opponent"}`,
-						); // Debug logging
-						break;
-					}
-					case "-heal": {
-						const [_, pokemon, hpInfo] = args;
-						const isPlayer = pokemon.startsWith("p1");
-						const [hp, maxHp] = this.parseHPString(hpInfo);
-
-						if (isPlayer) {
-							this.state.playerPokemon.hp = hp;
-							this.state.playerPokemon.maxHp = maxHp;
-						} else {
-							this.state.opponentPokemon.hp = hp;
-							this.state.opponentPokemon.maxHp = maxHp;
-						}
-						console.log(
-							`Heal to ${isPlayer ? "player" : "opponent"}: HP = ${hp}/${maxHp}`,
-						); // Debug logging
-						break;
-					}
-					case "swap":
-					case "switch":
-					case "drag": {
-						const [_, pokemon] = args;
-						const isPlayer = pokemon.startsWith("p1");
-						console.log(`Switch/Drag/Swap: ${pokemon}`); // Debug logging
-						break;
-					}
-					case "start": {
-						console.log("Battle started"); // Debug logging
-						break;
-					}
-					case "request": {
-						console.log("Request received"); // Debug logging
-						// Resolve any pending updates when receiving a new request
-						if (this.resolveUpdate) {
-							console.log("Resolving update after request"); // Debug logging
-							this.resolveUpdate({ ...this.state });
-							this.resolveUpdate = null;
-						}
-						break;
-					}
-					case "-end": // Use "-end" instead of "end" to match protocol specs
-					case "done": {
-						// Battle or turn ended
-						console.log("Battle or turn ended"); // Debug logging
-						this.state.inProgress = false;
-						// Resolve any pending updates
-						if (this.resolveUpdate) {
-							console.log("Resolving update after battle end/done"); // Debug logging
-							this.resolveUpdate({ ...this.state });
-							this.resolveUpdate = null;
-						}
-						break;
-					}
-					default: {
-						// For debugging unhandled commands
-						console.log(`Unhandled command: ${command}`); // Debug logging
-						break;
+					// Add to logs
+					const html = this.formatter.formatHTML(args, kwArgs);
+					if (html) {
+						this.battleState.logs.push(html);
 					}
 				}
-			} catch (error) {
-				console.error("Error processing battle line:", error, line);
+
+				// Update battle
+				this.battle.update();
+
+				// Notify listeners
+				this.onBattleUpdate({ ...this.battleState });
+			}
+		} catch (error) {
+			console.error('Battle stream error:', error);
+		}
+	}
+
+	/**
+	 * Pre-process battle events
+	 * @param key - The event key
+	 * @param args - The event arguments
+	 * @param kwArgs - The event keyword arguments
+	 */
+	private preProcess(key: ArgName | undefined, args: ArgType, kwArgs: BattleArgsKWArgType): void {
+		if (key === '|faint|') {
+			const pokemonId = args[1] as string;
+			this.handleFaint(pokemonId);
+		}
+	}
+
+	/**
+	 * Post-process battle events
+	 * @param key - The event key
+	 * @param args - The event arguments
+	 * @param kwArgs - The event keyword arguments
+	 */
+	private postProcess(key: ArgName | undefined, args: ArgType, kwArgs: BattleArgsKWArgType): void {
+		if (key === '|teampreview|') {
+			this.battleState.p1.team = [...this.battle.p1.team];
+			this.battleState.p2.team = [...this.battle.p2.team];
+			this.battleState.status = 'Team preview';
+		} else if (key === '|turn|') {
+			this.battleState.turn = Number(args[1]);
+			this.battleState.status = `Turn ${this.battleState.turn}`;
+
+			// Update active Pokémon
+			this.battleState.p1.active = this.battle.p1.active[0] || null;
+			this.battleState.p2.active = this.battle.p2.active[0] || null;
+		} else if (key === '|-weather|') {
+			const weather = args[1] as string;
+			this.battleState.weather = weather;
+
+			// Update status message based on weather
+			let weatherText = '';
+			switch (weather) {
+				case 'RainDance':
+					weatherText = 'It\'s raining!';
+					break;
+				case 'Sandstorm':
+					weatherText = 'A sandstorm is raging!';
+					break;
+				case 'SunnyDay':
+					weatherText = 'The sunlight is strong!';
+					break;
+				case 'Hail':
+					weatherText = 'It\'s hailing!';
+					break;
+				case 'none':
+					weatherText = 'The weather cleared up!';
+					break;
+				default:
+					weatherText = `Weather: ${weather}`;
+			}
+			this.battleState.status = weatherText;
+		}
+	}
+
+	/**
+	 * Handle a fainted Pokémon
+	 * @param pokemonId - The Pokémon ID
+	 */
+	private handleFaint(pokemonId: string): void {
+		console.log(`${pokemonId} has fainted!`);
+
+		// Determine the winner
+		const winner = pokemonId.startsWith('p1') ? 'p2' : 'p1';
+		const winnerName = winner === 'p1' ? this.p1.playerName : this.p2.playerName;
+
+		// Update battle status
+		this.battleState.status = `${winnerName} has won the battle!`;
+	}
+
+	/**
+	 * Handle a player request
+	 * @param player - The player ID
+	 * @param request - The request
+	 */
+	private handlePlayerRequest(player: 'p1' | 'p2', request: BattleRequest): void {
+		// Store the request in battle state
+		this.battleState[player].request = request;
+
+		// Update active Pokémon if available
+		if (request.active && request.side && request.side.pokemon) {
+			const activePokemon = this.battle[player].active[0];
+			if (activePokemon) {
+				this.battleState[player].active = activePokemon;
 			}
 		}
 
-		// Resolve at the end of processing all lines if not already resolved
-		if (this.resolveUpdate) {
-			console.log("Resolving update at end of chunk"); // Debug logging
-			this.resolveUpdate({ ...this.state });
-			this.resolveUpdate = null;
-		}
+		// Notify listeners
+		this.onBattleUpdate({ ...this.battleState });
 	}
 
 	/**
-	 * Parse HP string to get current HP and max HP
+	 * Start the battle
+	 * @param p1Team - Optional team for player 1
+	 * @param p2Team - Optional team for player 2
 	 */
-	private parseHPString(hpString: string): [number, number] {
-		if (hpString.includes("/")) {
-			const [currentHP, maxHP] = hpString.split("/");
-			return [Number.parseInt(currentHP, 10), Number.parseInt(maxHP, 10)];
-		}
-		return [0, 100]; // Default values
-	}
-
-	/**
-	 * Create a new battle with a player and opponent Pokemon
-	 * Follows the protocol in https://github.com/smogon/pokemon-showdown/blob/master/sim/SIMULATOR.md
-	 */
-	async createBattle(
-		playerPokemon: { id: string; moves: string[] },
-		opponentPokemon: { id: string; moves: string[] },
-	): Promise<BattleState> {
-		this.resetBattle();
-		console.log("Creating new battle"); // Debug logging
-
-		// Create player Pokemon set
-		const playerSet: PokemonSet = {
-			name: playerPokemon.id,
-			species: playerPokemon.id,
-			item: "",
-			ability: "",
-			moves: playerPokemon.moves,
-			nature: "",
-			gender: "",
-			evs: { hp: 252, atk: 252, def: 252, spa: 252, spd: 252, spe: 252 }, // Full EVs for demo
-			ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
-			level: 100,
-		};
-
-		// Create opponent Pokemon set
-		const opponentSet: PokemonSet = {
-			name: opponentPokemon.id,
-			species: opponentPokemon.id,
-			item: "",
-			ability: "",
-			moves: opponentPokemon.moves,
-			nature: "",
-			gender: "",
-			evs: { hp: 252, atk: 252, def: 252, spa: 252, spd: 252, spe: 252 }, // Full EVs for demo
-			ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
-			level: 100,
-		};
-
-		// Pack teams
-		const playerTeam = DTeams.pack([playerSet]);
-		const opponentTeam = DTeams.pack([opponentSet]);
-
-		console.log("Player team:", playerTeam); // Debug logging
-		console.log("Opponent team:", opponentTeam); // Debug logging
-
-		// Define battle format
-		const battleSpec = {
-			formatid: `gen${GENERATION}customgame`,
-			seed: this.prng.seed, // Add a seed for consistent results
-		};
-
-		// Define player options
+	startBattle(p1Team?: string, p2Team?: string): void {
+		const spec = { formatid: this.format };
 		const p1spec = {
-			name: "Player",
-			team: playerTeam,
+			name: this.p1.playerName,
 		};
-
-		// Define opponent options
 		const p2spec = {
-			name: "Opponent",
-			team: opponentTeam,
+			name: this.p2.playerName,
 		};
 
-		// Following the exact protocol format from the documentation
-		const startCommand = `>start ${JSON.stringify(battleSpec)}
+
+		// Start the battle
+		void this.streams.omniscient.write(`>start ${JSON.stringify(spec)}
 >player p1 ${JSON.stringify(p1spec)}
->player p2 ${JSON.stringify(p2spec)}`;
-
-		console.log("Start command:", startCommand); // Debug logging
-
-		try {
-			// Set battleStarted before writing to stream
-			this.battleStarted = true;
-
-			// Write to stream and wait for response
-			await this.stream.omniscient.write(startCommand);
-
-			// Wait for battle to initialize
-			const result = await this.waitForUpdate();
-			console.log("Battle created with result:", result); // Debug logging
-			return result;
-		} catch (error) {
-			console.error("Error creating battle:", error);
-			this.battleStarted = false;
-			throw error;
-		}
+>player p2 ${JSON.stringify(p2spec)}`);
 	}
 
 	/**
-	 * Make a move for both player and opponent
-	 * Follows the protocol in https://github.com/smogon/pokemon-showdown/blob/master/sim/SIMULATOR.md
+	 * Make a move for player 1
+	 * @param moveIndex - The move index (1-based)
 	 */
-	async makeMove(
-		playerMove: string,
-		opponentMove: string,
-	): Promise<BattleState> {
-		if (!this.battleStarted) {
-			throw new Error("Battle has not been started yet");
-		}
-
-		if (this.state.winner) {
-			throw new Error("Battle is already over");
-		}
-
-		console.log(
-			`Making moves: Player: ${playerMove}, Opponent: ${opponentMove}`,
-		); // Debug logging
-
-		// Clear previous results
-		this.state.lastResults = [];
-		this.state.inProgress = true;
-
-		// Format move command according to the protocol
-		// The protocol expects move indices or move names, so we need to use the actual move name
-		const moveCommand = `>p1 move ${playerMove}
->p2 move ${opponentMove}`;
-
-		console.log("Move command:", moveCommand); // Debug logging
-
-		try {
-			// Write to stream and wait for response
-			await this.stream.omniscient.write(moveCommand);
-
-			// Wait for update with timeout
-			const result = await this.waitForUpdate(5000); // 5 second timeout
-			console.log("Move completed with result:", result); // Debug logging
-			return result;
-		} catch (error) {
-			console.error("Error making move:", error);
-			// Update state to not be in progress anymore in case of error
-			this.state.inProgress = false;
-			throw error;
-		}
+	makeP1Move(moveIndex: number): void {
+		this.p1.makeMove(moveIndex);
 	}
 
 	/**
-	 * Reset the battle state
+	 * Make a move for player 2
+	 * @param moveIndex - The move index (1-based)
 	 */
-	private resetBattle() {
-		this.state = {
-			inProgress: false,
-			turn: 0,
-			playerPokemon: {
-				name: "",
-				hp: 0,
-				maxHp: 0,
-			},
-			opponentPokemon: {
-				name: "",
-				hp: 0,
-				maxHp: 0,
-			},
-			lastResults: [],
-			winner: null,
-		};
-		this.battleStarted = false;
-	}
-
-	/**
-	 * Wait for the battle state to update with optional timeout
-	 */
-	private waitForUpdate(timeout?: number): Promise<BattleState> {
-		return new Promise((resolve, reject) => {
-			// Set timeout if provided
-			let timeoutId: NodeJS.Timeout | undefined;
-			if (timeout) {
-				timeoutId = setTimeout(() => {
-					// If timeout occurs and update hasn't resolved yet
-					if (this.resolveUpdate === resolve) {
-						this.resolveUpdate = null;
-						console.log("Update timed out after", timeout, "ms"); // Debug logging
-						this.state.inProgress = false; // Ensure we're not stuck
-						reject(new Error(`Battle update timed out after ${timeout}ms`));
-					}
-				}, timeout);
-			}
-
-			// Set resolve function
-			this.resolveUpdate = (value: BattleState) => {
-				if (timeoutId) clearTimeout(timeoutId);
-				resolve(value);
-			};
-		});
+	makeP2Move(moveIndex: number): void {
+		this.p2.makeMove(moveIndex);
 	}
 
 	/**
 	 * Get the current battle state
+	 * @returns The battle state
 	 */
 	getBattleState(): BattleState {
-		return { ...this.state };
+		return { ...this.battleState };
+	}
+
+	/**
+	 * Get move data for a Pokémon
+	 * @param moveId - The move ID
+	 * @returns The move data
+	 */
+	getMoveData(moveId: string) {
+		return this.dex.moves.get(moveId);
+	}
+
+	/**
+	 * Get a sprite URL for a Pokémon
+	 * @param pokemon - The Pokémon
+	 * @returns The sprite URL
+	 */
+	getPokemonSprite(pokemon: Pokemon): string {
+		const gen = Number(this.format.charAt(3)) as GenerationNum;
+		const sprites = [
+			'gen1rg', 'gen1rb', 'gen1',
+			'gen2g', 'gen2s', 'gen2',
+			'gen3rs', 'gen3frlg', 'gen3', 'gen3-2',
+			'gen4dp', 'gen4dp-2', 'gen4',
+			'gen5', 'gen5ani',
+			'ani', 'ani', 'ani', 'ani'
+		];
+
+		const graphicsGen = this.prng.sample(sprites) as GraphicsGen;
+
+		const sprite = Sprites.getPokemon(pokemon.speciesForme, {
+			gen: graphicsGen,
+			gender: pokemon.gender || undefined,
+			shiny: pokemon.shiny,
+		});
+
+		return sprite.url;
+	}
+
+	/**
+	 * Get an icon URL for a Pokémon
+	 * @param pokemon - The Pokémon
+	 * @param side - The side ('p1' or 'p2')
+	 * @returns The icon URL
+	 */
+	getPokemonIcon(pokemon: Pokemon, side: 'p1' | 'p2'): string {
+		const icon = Icons.getPokemon(pokemon.speciesForme, {
+			side: side,
+			gender: pokemon.gender || undefined,
+			fainted: pokemon.fainted,
+			domain: 'pkmn.cc',
+		});
+
+		return icon.url;
 	}
 }

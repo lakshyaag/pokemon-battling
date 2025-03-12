@@ -17,14 +17,12 @@ export default function Home() {
 					>
 						Start a Battle
 					</Link>
-					<a
+					<Link
 						className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto"
-						href="https://github.com/pkmn/ps"
-						target="_blank"
-						rel="noopener noreferrer"
+						href="/battle?format=gen3randombattle"
 					>
-						Learn about @pkmn/ps
-					</a>
+						Quick Random Battle
+					</Link>
 				</div>
 
 				<div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
@@ -36,8 +34,8 @@ export default function Home() {
 							The app will randomly select an opponent Pokemon with its own
 							random moves
 						</li>
-						<li>Select one move for your Pokemon and one for your opponent</li>
-						<li>Watch the battle play out with basic mechanics</li>
+						<li>Select moves for your Pokemon during the battle</li>
+						<li>Watch the battle play out with detailed mechanics</li>
 					</ol>
 				</div>
 			</main>
