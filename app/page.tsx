@@ -17,7 +17,7 @@ export default function Home() {
 						<Link href="/pkmn-select">Start a Battle</Link>
 					</Button>
 					<Button variant="outline" size="lg" asChild>
-						<Link href="/battle?format=gen3randombattle">
+						<Link href="/battle">
 							Quick Random Battle
 						</Link>
 					</Button>
@@ -29,7 +29,7 @@ export default function Home() {
 					</CardHeader>
 					<CardContent>
 						<ol className="list-decimal pl-5 space-y-2">
-							<li>Select your Pokemon from the Gen 1 Pokedex</li>
+							<li>Select your Pokemon from the Pokedex</li>
 							<li>Get assigned 4 random moves from that Pokemon's learnset</li>
 							<li>
 								The app will randomly select an opponent Pokemon with its own

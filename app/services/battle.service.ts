@@ -17,6 +17,8 @@ import {
 import type { ObjectReadWriteStream } from "@pkmn/streams";
 import { LogFormatter } from "@pkmn/view";
 import type { BattleRequest } from "./player";
+import { Sprites } from "@pkmn/img";
+import { GRAPHICS } from "@/lib/constants";
 
 /**
  * Interface for battle options
@@ -39,11 +41,13 @@ interface BattleState {
         active: Pokemon | null;
         team: Pokemon[];
         request: BattleRequest | null;
+        selectedMove: number | null;
     };
     p2: {
         active: Pokemon | null;
         team: Pokemon[];
         request: BattleRequest | null;
+        selectedMove: number | null;
     };
     weather: string;
     status: string;
@@ -220,8 +224,8 @@ export class BattleService {
         // Initialize battle state
         this.battleState = {
             turn: 0,
-            p1: { active: null, team: [], request: null },
-            p2: { active: null, team: [], request: null },
+            p1: { active: null, team: [], request: null, selectedMove: null },
+            p2: { active: null, team: [], request: null, selectedMove: null },
             weather: "none",
             status: "Initializing battle...",
             logs: [],
@@ -327,7 +331,7 @@ export class BattleService {
             this.battleState.status = "Team preview";
         } else if (key === "|turn|") {
             this.battleState.turn = Number(args[1]);
-            this.battleState.status = `Turn ${this.battleState.turn}`;
+            this.battleState.status = `Current Turn: ${this.battleState.turn}`;
 
             // Update active Pokémon
             this.battleState.p1.active = this.battle.p1.active[0] || null;
@@ -454,5 +458,22 @@ export class BattleService {
      */
     getMoveData(moveId: string) {
         return this.dex.moves.get(moveId);
+    }
+
+    getSprite(pokemon: Pokemon, player: "p1" | "p2") {
+        return Sprites.getPokemon(pokemon.speciesForme, {
+            side: player,
+            gender: pokemon.gender || undefined,
+            gen: GRAPHICS,
+            shiny: pokemon.shiny,
+        });
+    }
+
+    getItem(itemId: string) {
+        return this.dex.items.get(itemId);
+    }
+
+    getAbility(abilityId: string) {
+        return this.dex.abilities.get(abilityId);
     }
 }

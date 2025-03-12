@@ -1,7 +1,8 @@
 import type { TypeName } from "@pkmn/types";
 
-export const GENERATION = 1;
+export const GENERATION = 3;
 export const FORMAT = `gen${GENERATION}randombattle`;
+export const GRAPHICS = 'gen3rs';
 
 // Type color mapping
 export const TYPE_COLORS: Partial<Record<TypeName, string>> = {

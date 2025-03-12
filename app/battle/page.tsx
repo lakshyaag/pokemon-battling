@@ -1,13 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import BattleComponent from "../components/BattleView";
 import Link from "next/link";
 import { useBattleStore } from "../store/battle-store";
-/**
- * Battle page component
- */
+
 export default function BattlePage() {
 	const { p1Team, p2Team } = useBattleStore();
 

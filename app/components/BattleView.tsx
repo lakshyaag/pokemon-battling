@@ -4,7 +4,17 @@ import React, { useState, useEffect, useRef } from "react";
 import { BattleService } from "../services/battle.service";
 import type { Pokemon } from "@pkmn/client";
 import type { BattleRequest } from "../services/player";
-import { FORMAT } from "@/lib/constants";
+import { FORMAT, TYPE_COLORS } from "@/lib/constants";
+import BattleMoveButton from "./BattleMoveButton";
+import { Badge } from "./ui/badge";
+import { getStatusClass } from "@/lib/utils";
+import { getStatusName } from "@/lib/utils";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "./ui/tooltip";
 
 interface BattleComponentProps {
 	format?: string;
@@ -23,11 +33,13 @@ interface BattleState {
 		active: Pokemon | null;
 		team: Pokemon[];
 		request: BattleRequest | null;
+		selectedMove: number | null;
 	};
 	p2: {
 		active: Pokemon | null;
 		team: Pokemon[];
 		request: BattleRequest | null;
+		selectedMove: number | null;
 	};
 	weather: string;
 	status: string;
@@ -47,8 +59,8 @@ export default function BattleComponent({
 	const battleServiceRef = useRef<BattleService | null>(null);
 	const [battleState, setBattleState] = useState<BattleState>({
 		turn: 0,
-		p1: { active: null, team: [], request: null },
-		p2: { active: null, team: [], request: null },
+		p1: { active: null, team: [], request: null, selectedMove: null },
+		p2: { active: null, team: [], request: null, selectedMove: null },
 		weather: "none",
 		status: "Initializing battle...",
 		logs: [],
@@ -79,13 +91,30 @@ export default function BattleComponent({
 
 	// Handle move selection for player 1
 	const handleP1MoveSelect = (moveIndex: number) => {
+		setBattleState((prev) => ({
+			...prev,
+			p1: { ...prev.p1, selectedMove: moveIndex },
+		}));
 		battleServiceRef.current?.makeP1Move(moveIndex);
 	};
 
 	// Handle move selection for player 2
 	const handleP2MoveSelect = (moveIndex: number) => {
+		setBattleState((prev) => ({
+			...prev,
+			p2: { ...prev.p2, selectedMove: moveIndex },
+		}));
 		battleServiceRef.current?.makeP2Move(moveIndex);
 	};
+
+	// Reset selected moves after each turn
+	useEffect(() => {
+		setBattleState((prev) => ({
+			...prev,
+			p1: { ...prev.p1, selectedMove: null },
+			p2: { ...prev.p2, selectedMove: null },
+		}));
+	}, []);
 
 	// Parse HP and status from condition string
 	const parseCondition = (pokemon?: Pokemon) => {
@@ -101,7 +130,20 @@ export default function BattleComponent({
 	// Render player's Pokémon information
 	const renderPokemonInfo = (player: "p1" | "p2") => {
 		const pokemon = battleState[player].active;
+		const pokemonFromRequest = battleState[player].request?.side.pokemon[0];
+
 		if (!pokemon) return <div>No active Pokémon</div>;
+
+		const sprite = battleServiceRef.current?.getSprite(pokemon, player);
+		const item = pokemonFromRequest?.item
+			? battleServiceRef.current?.getItem(pokemonFromRequest.item)
+			: null;
+		const ability = pokemonFromRequest?.baseAbility
+			? battleServiceRef.current?.getAbility(pokemonFromRequest.baseAbility)
+			: null;
+
+		console.log(item);
+		console.log(ability);
 
 		// Extract HP information from condition
 		const { currentHP, maxHP, status } = parseCondition(pokemon);
@@ -114,115 +156,89 @@ export default function BattleComponent({
 
 		return (
 			<div className="mb-5">
-				<h3 className="text-lg font-semibold mb-2">{pokemon.name}</h3>
-				<div className="mb-2">
+				<div className="flex items-center mb-3">
+					<img
+						src={sprite?.url}
+						alt={pokemon.name}
+						className="w-24 h-24 mr-3"
+					/>
+					<div>
+						<h3 className="text-lg font-semibold">{pokemon.name}</h3>
+						{pokemon.types && (
+							<div className="flex gap-1 mt-1">
+								{pokemon.types.map((type) => (
+									<Badge
+										key={type}
+										variant="secondary"
+										className={`${TYPE_COLORS[type]} text-white text-xs px-2 py-0`}
+									>
+										{type}
+									</Badge>
+								))}
+							</div>
+						)}
+					</div>
+				</div>
+
+				<div className="mb-3">
 					<div className="flex justify-between mb-1">
-						<span>HP:</span>
-						<span>
-							{currentHP}/{maxHP}
+						<span className="font-medium">HP:</span>
+						<span className="font-medium">
+							{currentHP}/{maxHP} ({Math.round(hpPercentage)}%)
 						</span>
 					</div>
-					<div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+					<div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
 						<div
 							className={`h-full ${hpColor} transition-all duration-300`}
 							style={{ width: `${hpPercentage}%` }}
 						/>
 					</div>
 				</div>
-				{status && (
-					<div
-						className={`inline-block px-2 py-1 rounded text-xs font-semibold mt-2 ${getStatusClass(status)}`}
-					>
-						{getStatusName(status)}
-					</div>
-				)}
+
+				<div className="flex flex-col gap-1 mb-1">
+					{item && (
+						<div className="flex justify-between">
+							<span className="font-medium">Item:</span>
+							<TooltipProvider>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<span className="font-medium">{item.name}</span>
+									</TooltipTrigger>
+									<TooltipContent>
+										<span>{item.desc}</span>
+									</TooltipContent>
+								</Tooltip>
+							</TooltipProvider>
+						</div>
+					)}
+					{ability && (
+						<div className="flex justify-between">
+							<span className="font-medium">Ability:</span>
+							<TooltipProvider>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<span className="font-medium">{ability.name}</span>
+									</TooltipTrigger>
+									<TooltipContent>
+										<span>{ability.desc}</span>
+									</TooltipContent>
+								</Tooltip>
+							</TooltipProvider>
+						</div>
+					)}
+				</div>
+
+				<div className="flex flex-wrap gap-2">
+					{status && (
+						<div
+							className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusClass(status)}`}
+						>
+							{getStatusName(status)}
+						</div>
+					)}
+				</div>
 			</div>
 		);
-	};
-
-	// Get status class for styling
-	const getStatusClass = (status: string): string => {
-		switch (status.toLowerCase()) {
-			case "par":
-				return "bg-yellow-400 text-yellow-900";
-			case "psn":
-			case "tox":
-				return "bg-purple-600 text-white";
-			case "brn":
-				return "bg-orange-500 text-white";
-			case "slp":
-				return "bg-gray-400 text-gray-900";
-			case "frz":
-				return "bg-blue-300 text-blue-900";
-			default:
-				return "bg-gray-600 text-white";
-		}
-	};
-
-	// Get status display name
-	const getStatusName = (status: string): string => {
-		switch (status.toLowerCase()) {
-			case "par":
-				return "Paralyzed";
-			case "psn":
-				return "Poisoned";
-			case "tox":
-				return "Badly Poisoned";
-			case "brn":
-				return "Burned";
-			case "slp":
-				return "Asleep";
-			case "frz":
-				return "Frozen";
-			default:
-				return status;
-		}
-	};
-
-	// Get type class for styling
-	const getTypeClass = (type?: string): string => {
-		if (!type) return "bg-gray-500 text-white";
-
-		switch (type.toLowerCase()) {
-			case "normal":
-				return "bg-gray-400 text-gray-900";
-			case "fighting":
-				return "bg-red-700 text-white";
-			case "flying":
-				return "bg-indigo-300 text-indigo-900";
-			case "poison":
-				return "bg-purple-600 text-white";
-			case "ground":
-				return "bg-yellow-600 text-white";
-			case "rock":
-				return "bg-yellow-800 text-white";
-			case "bug":
-				return "bg-green-600 text-white";
-			case "ghost":
-				return "bg-purple-800 text-white";
-			case "steel":
-				return "bg-gray-400 text-gray-900";
-			case "fire":
-				return "bg-orange-500 text-white";
-			case "water":
-				return "bg-blue-500 text-white";
-			case "grass":
-				return "bg-green-500 text-white";
-			case "electric":
-				return "bg-yellow-400 text-yellow-900";
-			case "psychic":
-				return "bg-pink-500 text-white";
-			case "ice":
-				return "bg-blue-300 text-blue-900";
-			case "dragon":
-				return "bg-indigo-600 text-white";
-			case "dark":
-				return "bg-gray-700 text-white";
-			case "fairy":
-				return "bg-pink-300 text-pink-900";
-			default:
-				return "bg-gray-500 text-white";
-		}
 	};
 
 	// Render available moves for a player
@@ -234,6 +250,7 @@ export default function BattleComponent({
 
 		const active = request.active[0];
 		const moves = active.moves || [];
+		const selectedMove = battleState[player].selectedMove;
 
 		return (
 			<div className="mt-5">
@@ -242,48 +259,26 @@ export default function BattleComponent({
 					{moves.map((move, index) => {
 						// Get move details if battleService is available
 						const moveData = battleServiceRef.current?.getMoveData(move.id);
+						if (!moveData) {
+							return null;
+						}
 
 						return (
-							<button
+							<BattleMoveButton
 								key={move.id}
-								type="button"
-								className={`p-2.5 rounded border text-left transition-colors ${
-									move.disabled
-										? "border-gray-300 bg-gray-100 opacity-70 cursor-not-allowed"
-										: "border-green-500 bg-green-50 hover:bg-green-100"
-								}`}
-								onClick={() =>
-									player === "p1"
-										? handleP1MoveSelect(index + 1)
-										: handleP2MoveSelect(index + 1)
-								}
+								moveDetails={move}
+								// @ts-ignore - The type error is due to a mismatch between @pkmn/sim and @pkmn/dex-types
+								moveData={moveData}
+								isSelected={selectedMove === index + 1}
+								onClick={() => {
+									if (player === "p1") {
+										handleP1MoveSelect(index + 1);
+									} else {
+										handleP2MoveSelect(index + 1);
+									}
+								}}
 								disabled={move.disabled}
-							>
-								<div className="flex justify-between items-center mb-1">
-									<span className="font-semibold">{move.move}</span>
-									{moveData && (
-										<span
-											className={`px-1.5 py-0.5 rounded text-xs ${getTypeClass(moveData.type)}`}
-										>
-											{moveData.type}
-										</span>
-									)}
-								</div>
-								<div className="grid grid-cols-3 text-xs">
-									<span>
-										PP: {move.pp}/{move.maxpp}
-									</span>
-									{moveData && (
-										<>
-											<span>Power: {moveData.basePower || "-"}</span>
-											<span>
-												Acc:{" "}
-												{moveData.accuracy === true ? "-" : moveData.accuracy}
-											</span>
-										</>
-									)}
-								</div>
-							</button>
+							/>
 						);
 					})}
 				</div>
@@ -313,12 +308,20 @@ export default function BattleComponent({
 	return (
 		<div className="flex flex-col w-full max-w-6xl mx-auto p-5 bg-gray-100 rounded-lg shadow-md">
 			<div className="text-center mb-5">
-				<h2 className="text-2xl font-bold">Pokémon Battle</h2>
 				<div className="flex justify-center gap-5 mt-2.5">
-					<span>Turn: {battleState.turn}</span>
-					<span>{battleState.status}</span>
+					<Badge variant="outline" className="px-3 py-1 text-sm font-medium">
+						Turn: {battleState.turn}
+					</Badge>
+					<Badge variant="secondary" className="px-3 py-1 text-sm font-medium">
+						{battleState.status}
+					</Badge>
 					{battleState.weather !== "none" && (
-						<span>Weather: {battleState.weather}</span>
+						<Badge
+							variant="outline"
+							className="px-3 py-1 text-sm font-medium bg-blue-100"
+						>
+							{battleState.weather}
+						</Badge>
 					)}
 				</div>
 			</div>
