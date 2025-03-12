@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import type { Pokemon } from '@pkmn/client';
 import type { PokemonData } from '@/components/PokemonSelector';
 
 interface BattleState {

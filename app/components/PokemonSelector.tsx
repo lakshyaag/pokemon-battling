@@ -3,10 +3,16 @@ import { Generations, type Specie } from "@pkmn/data";
 import { Teams } from "@pkmn/sim";
 import { Dex } from "@pkmn/dex";
 import { Sprites } from "@pkmn/img";
-import { GENERATION, TYPE_COLORS } from "@/lib/constants";
+import { TYPE_COLORS } from "@/lib/constants";
 import { getRandomMovesForPokemon } from "../utils/pokemonUtils";
-import { BattleService } from "../services/battle.service";
 import PokemonCard from "./PokemonCard";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Swords } from "lucide-react";
+import { useBattleStore } from "@/app/store/battle-store";
+import { useRouter } from "next/navigation";
+import { useSettings } from "@/app/store/settings";
 import {
 	Select,
 	SelectContent,
@@ -15,12 +21,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Swords } from "lucide-react";
-import { useBattleStore } from "../store/battle-store";
-import { useRouter } from "next/navigation";
 
 export type PokemonData = Specie & {
 	sprite: string;
@@ -46,6 +46,7 @@ export default function PokemonSelector() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isLoadingMoves, setIsLoadingMoves] = useState(false);
 	const [isStartingBattle, setIsStartingBattle] = useState(false);
+	const { generation } = useSettings();
 
 	// Memoize the sorted Pokemon list
 	const sortedPokemon = useMemo(() => {
@@ -57,13 +58,13 @@ export default function PokemonSelector() {
 		const fetchPokemonData = async () => {
 			try {
 				const gens = new Generations(Dex);
-				const gen = gens.get(GENERATION);
+				const gen = gens.get(generation);
 
 				// Get all Pokemon from Gen 1
 				const pokemonList = Array.from(gen.species).map((species) => {
 					// Get sprite URL using @pkmn/img
 					const spriteUrl = Sprites.getPokemon(species.name, {
-						gen: GENERATION,
+						gen: generation,
 						side: "p2",
 					}).url;
 
@@ -83,7 +84,7 @@ export default function PokemonSelector() {
 		};
 
 		fetchPokemonData();
-	}, []);
+	}, [generation]);
 
 	const getRandomMoves = useCallback(
 		async (pokemonId: string) => {

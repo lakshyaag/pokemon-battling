@@ -9,6 +9,7 @@ import {
 	CardFooter,
 } from "@/components/ui/card";
 import { ArrowRight, Swords, Dices } from "lucide-react";
+import { GenerationSelector } from "@/components/GenerationSelector";
 
 export default function Home() {
 	return (
@@ -22,6 +23,10 @@ export default function Home() {
 						Experience thrilling Pokemon battles! Choose your Pokemon and moves,
 						or jump straight into a random battle for quick action.
 					</p>
+					<div className="flex items-center gap-4">
+						<p className="text-muted-foreground">Select Pokemon Generation:</p>
+						<GenerationSelector />
+					</div>
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">

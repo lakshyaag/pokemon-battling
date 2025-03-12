@@ -4,9 +4,12 @@ import BattleComponent from "../components/BattleView";
 import Link from "next/link";
 import { useBattleStore } from "../store/battle-store";
 import { Button } from "@/components/ui/button";
-
 import BackgroundMusic from "../components/BackgroundMusic";
+import { useSettings } from "../store/settings";
+import { getFormat } from "@/lib/constants";
+
 export default function BattlePage() {
+	const { generation } = useSettings();
 	const { p1Team, p2Team } = useBattleStore();
 
 	return (
@@ -20,7 +23,11 @@ export default function BattlePage() {
 				<div className="w-[100px]" />
 			</div>
 
-			<BattleComponent p1Team={p1Team} p2Team={p2Team} />
+			<BattleComponent
+				format={getFormat(generation)}
+				p1Team={p1Team}
+				p2Team={p2Team}
+			/>
 		</div>
 	);
 }

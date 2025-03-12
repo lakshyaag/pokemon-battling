@@ -15,9 +15,8 @@ const SPRITES: { [gen in GenerationNum]: GraphicsGen[] } = {
 };
 
 const prng = new PRNG();
-export const GENERATION = 3;
-export const FORMAT = `gen${GENERATION}randombattle`;
-export const GRAPHICS = prng.sample(SPRITES[GENERATION]);
+export const getFormat = (generation: GenerationNum) => `gen${generation}randombattle`;
+export const getGraphics = (generation: GenerationNum) => prng.sample(SPRITES[generation]);
 
 // Type color mapping
 export const TYPE_COLORS: Partial<Record<TypeName, string>> = {

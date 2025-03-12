@@ -4,15 +4,15 @@ import React, { useState, useEffect, useRef } from "react";
 import { BattleService } from "../services/battle.service";
 import type { Pokemon } from "@pkmn/client";
 import type { BattleRequest } from "../services/player";
-import { FORMAT, TYPE_COLORS } from "@/lib/constants";
+import { TYPE_COLORS } from "@/lib/constants";
 import BattleMoveButton from "./BattleMoveButton";
 import { Badge } from "./ui/badge";
-import { getStatusClass } from "@/lib/utils";
-import { getStatusName } from "@/lib/utils";
+import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { getSprite } from "../utils/pokemonUtils";
 
 interface BattleComponentProps {
-	format?: string;
+	format: string;
 	p1Name?: string;
 	p2Name?: string;
 	p1Team?: string;
@@ -45,7 +45,7 @@ interface BattleState {
  * Component for displaying and interacting with a Pokémon battle
  */
 export default function BattleComponent({
-	format = FORMAT,
+	format,
 	p1Name = "Player 1",
 	p2Name = "Player 2",
 	p1Team,
@@ -129,7 +129,7 @@ export default function BattleComponent({
 
 		if (!pokemon) return <div>No active Pokémon</div>;
 
-		const sprite = battleServiceRef.current?.getSprite(pokemon, player);
+		const sprite = getSprite(pokemon, player);
 		const item = pokemonFromRequest?.item
 			? battleServiceRef.current?.getItem(pokemonFromRequest.item)
 			: null;
@@ -282,7 +282,7 @@ export default function BattleComponent({
 			<div className="h-full flex flex-col">
 				<h3 className="text-lg font-semibold mb-3">Battle Log</h3>
 				<pre className="text-sm font-medium bg-green-100 border-green-200">
-					{FORMAT}
+					{format}
 				</pre>
 				<div className="flex-1 overflow-y-auto max-h-[400px] p-2.5 border border-gray-200 rounded bg-gray-50">
 					{battleState.logs.map((log: string, index: number) => (

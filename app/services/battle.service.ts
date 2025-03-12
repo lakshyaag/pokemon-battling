@@ -17,8 +17,6 @@ import {
 import type { ObjectReadWriteStream } from "@pkmn/streams";
 import { LogFormatter } from "@pkmn/view";
 import type { BattleRequest } from "./player";
-import { Sprites } from "@pkmn/img";
-import { GRAPHICS } from "@/lib/constants";
 
 /**
  * Interface for battle options
@@ -458,15 +456,6 @@ export class BattleService {
      */
     getMoveData(moveId: string) {
         return this.dex.moves.get(moveId);
-    }
-
-    getSprite(pokemon: Pokemon, player: "p1" | "p2") {
-        return Sprites.getPokemon(pokemon.speciesForme, {
-            side: player,
-            gender: pokemon.gender || undefined,
-            gen: GRAPHICS,
-            shiny: pokemon.shiny,
-        });
     }
 
     getItem(itemId: string) {

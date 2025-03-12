@@ -1,7 +1,10 @@
-import { GENERATION } from "@/lib/constants";
 import { Generations, type Specie } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
 import type { PokemonData } from "../components/PokemonSelector";
+import { useSettings } from "@/app/store/settings";
+import { getGraphics } from "@/lib/constants";
+import type { Pokemon } from "@pkmn/client";
+import { Sprites } from "@pkmn/img";
 
 export type PokemonWithMoves = {
 	pokemon: PokemonData;
@@ -12,8 +15,9 @@ export type PokemonWithMoves = {
  * Generate a random Pokemon
  */
 export async function getRandomPokemon(): Promise<PokemonWithMoves> {
+	const { generation } = useSettings.getState();
 	const gens = new Generations(Dex);
-	const gen = gens.get(GENERATION);
+	const gen = gens.get(generation);
 
 	// Get all Pokemon
 	const allPokemon = Array.from(gen.species);
@@ -39,8 +43,9 @@ export async function getRandomMovesForPokemon(
 	pokemon: Specie,
 ): Promise<string[]> {
 	try {
+		const { generation } = useSettings.getState();
 		const gens = new Generations(Dex);
-		const gen = gens.get(GENERATION);
+		const gen = gens.get(generation);
 
 		// Wait for the learnsets data to load
 		const learnsets = await gen.learnsets.get(pokemon.id);
@@ -49,14 +54,12 @@ export async function getRandomMovesForPokemon(
 			throw new Error(`No learnset data found for ${pokemon.name}`);
 		}
 
-		console.log(learnsets);
-
 		// Get all moves for this Pokemon
 		const availableMoves: string[] = [];
 
 		for (const moveId in learnsets.learnset) {
 			const sources = learnsets.learnset[moveId];
-			if (sources.some((source) => source.startsWith(GENERATION.toString()))) {
+			if (sources.some((source) => source.startsWith(generation.toString()))) {
 				// Get the actual move object to display proper name
 				const move = gen.moves.get(moveId);
 				if (move) {
@@ -86,4 +89,14 @@ export async function getRandomMovesForPokemon(
 		console.error("Error getting moves:", error);
 		return [];
 	}
+}
+
+export const getSprite = (pokemon: Pokemon, player: "p1" | "p2") => {
+	const { generation } = useSettings.getState();
+	return Sprites.getPokemon(pokemon.speciesForme, {
+		side: player,
+		gender: pokemon.gender || undefined,
+		gen: getGraphics(generation),
+		shiny: pokemon.shiny,
+	});
 }
