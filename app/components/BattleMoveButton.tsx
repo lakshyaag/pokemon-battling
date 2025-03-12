@@ -26,14 +26,13 @@ export default function BattleMoveButton({
 	disabled = false,
 }: BattleMoveButtonProps) {
 	return (
-		<TooltipProvider>
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<button
-						type="button"
-						onClick={onClick}
-						disabled={disabled}
-						className={`
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<button
+					type="button"
+					onClick={onClick}
+					disabled={disabled}
+					className={`
 							w-full py-2 px-3 rounded text-sm capitalize border
 							${
 								isSelected
@@ -42,40 +41,37 @@ export default function BattleMoveButton({
 							}
 							${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
 						`}
-					>
-						{moveData.name.replace(/-/g, " ")}
-					</button>
-				</TooltipTrigger>
-				<TooltipContent className="p-3 max-w-xs">
-					<div className="space-y-2">
-						<div className="flex items-center justify-between">
-							<span className="font-semibold">{moveData.name}</span>
-							<Badge className={`${TYPE_COLORS[moveData.type]} text-white`}>
-								{moveData.type}
-							</Badge>
+				>
+					{moveData.name.replace(/-/g, " ")}
+				</button>
+			</TooltipTrigger>
+			<TooltipContent className="p-3 max-w-xs">
+				<div className="space-y-2">
+					<div className="flex items-center justify-between">
+						<span className="font-semibold">{moveData.name}</span>
+						<Badge className={`${TYPE_COLORS[moveData.type]} text-white`}>
+							{moveData.type}
+						</Badge>
+					</div>
+					<div className="grid grid-cols-3 gap-2 text-xs">
+						<div>
+							<span className="font-medium">Power:</span>{" "}
+							{moveData.basePower || "-"}
 						</div>
-						<div className="grid grid-cols-3 gap-2 text-xs">
-							<div>
-								<span className="font-medium">Power:</span>{" "}
-								{moveData.basePower || "-"}
-							</div>
-							<div>
-								<span className="font-medium">Acc:</span>{" "}
-								{moveData.accuracy === true ? "-" : moveData.accuracy}
-							</div>
-							<div>
-								<span className="font-medium">PP:</span> {moveDetails.pp} /{" "}
-								{moveDetails.maxpp}
-							</div>
+						<div>
+							<span className="font-medium">Acc:</span>{" "}
+							{moveData.accuracy === true ? "-" : moveData.accuracy}
 						</div>
-						<div className="text-xs text-gray-600">
-							{moveData.shortDesc ||
-								moveData.desc ||
-								"No description available."}
+						<div>
+							<span className="font-medium">PP:</span> {moveDetails.pp} /{" "}
+							{moveDetails.maxpp}
 						</div>
 					</div>
-				</TooltipContent>
-			</Tooltip>
-		</TooltipProvider>
+					<div className="text-xs text-gray-600">
+						{moveData.shortDesc || moveData.desc || "No description available."}
+					</div>
+				</div>
+			</TooltipContent>
+		</Tooltip>
 	);
 }

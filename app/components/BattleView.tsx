@@ -9,12 +9,7 @@ import BattleMoveButton from "./BattleMoveButton";
 import { Badge } from "./ui/badge";
 import { getStatusClass } from "@/lib/utils";
 import { getStatusName } from "@/lib/utils";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "./ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface BattleComponentProps {
 	format?: string;
@@ -142,9 +137,6 @@ export default function BattleComponent({
 			? battleServiceRef.current?.getAbility(pokemonFromRequest.baseAbility)
 			: null;
 
-		console.log(item);
-		console.log(ability);
-
 		// Extract HP information from condition
 		const { currentHP, maxHP, status } = parseCondition(pokemon);
 
@@ -199,31 +191,29 @@ export default function BattleComponent({
 					{item && (
 						<div className="flex justify-between">
 							<span className="font-medium">Item:</span>
-							<TooltipProvider>
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<span className="font-medium">{item.name}</span>
-									</TooltipTrigger>
-									<TooltipContent>
-										<span>{item.desc}</span>
-									</TooltipContent>
-								</Tooltip>
-							</TooltipProvider>
+
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<span className="font-medium">{item.name}</span>
+								</TooltipTrigger>
+								<TooltipContent>
+									<span>{item.desc}</span>
+								</TooltipContent>
+							</Tooltip>
 						</div>
 					)}
 					{ability && (
 						<div className="flex justify-between">
 							<span className="font-medium">Ability:</span>
-							<TooltipProvider>
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<span className="font-medium">{ability.name}</span>
-									</TooltipTrigger>
-									<TooltipContent>
-										<span>{ability.desc}</span>
-									</TooltipContent>
-								</Tooltip>
-							</TooltipProvider>
+
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<span className="font-medium">{ability.name}</span>
+								</TooltipTrigger>
+								<TooltipContent>
+									<span>{ability.desc}</span>
+								</TooltipContent>
+							</Tooltip>
 						</div>
 					)}
 				</div>
@@ -291,6 +281,9 @@ export default function BattleComponent({
 		return (
 			<div className="h-full flex flex-col">
 				<h3 className="text-lg font-semibold mb-3">Battle Log</h3>
+				<pre className="text-sm font-medium bg-green-100 border-green-200">
+					{FORMAT}
+				</pre>
 				<div className="flex-1 overflow-y-auto max-h-[400px] p-2.5 border border-gray-200 rounded bg-gray-50">
 					{battleState.logs.map((log: string, index: number) => (
 						<div
@@ -306,19 +299,25 @@ export default function BattleComponent({
 	};
 
 	return (
-		<div className="flex flex-col w-full max-w-6xl mx-auto p-5 bg-gray-100 rounded-lg shadow-md">
-			<div className="text-center mb-5">
-				<div className="flex justify-center gap-5 mt-2.5">
-					<Badge variant="outline" className="px-3 py-1 text-sm font-medium">
+		<div className="flex flex-col w-full max-w-7xl mx-auto p-6 bg-gradient-to-b from-gray-50 to-gray-100 rounded-xl shadow-lg">
+			<div className="text-center mb-6">
+				<div className="flex justify-center items-center gap-4 mt-2">
+					<Badge
+						variant="outline"
+						className="px-4 py-1.5 text-sm font-medium transition-colors"
+					>
 						Turn: {battleState.turn}
 					</Badge>
-					<Badge variant="secondary" className="px-3 py-1 text-sm font-medium">
+					<Badge
+						variant="secondary"
+						className="px-4 py-1.5 text-sm font-medium"
+					>
 						{battleState.status}
 					</Badge>
 					{battleState.weather !== "none" && (
 						<Badge
 							variant="outline"
-							className="px-3 py-1 text-sm font-medium bg-blue-100"
+							className="px-4 py-1.5 text-sm font-medium bg-blue-100 border-blue-200"
 						>
 							{battleState.weather}
 						</Badge>
@@ -326,19 +325,19 @@ export default function BattleComponent({
 				</div>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr] gap-5">
-				<div className="bg-white p-4 rounded-lg shadow">
-					<h3 className="text-xl font-semibold mb-3">{p1Name}</h3>
+			<div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_1.2fr] gap-6">
+				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+					<h3 className="text-xl font-bold mb-4 text-indigo-800">{p1Name}</h3>
 					{renderPokemonInfo("p1")}
 					{renderMoves("p1")}
 				</div>
 
-				<div className="bg-white p-4 rounded-lg shadow">
+				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
 					{renderBattleLogs()}
 				</div>
 
-				<div className="bg-white p-4 rounded-lg shadow">
-					<h3 className="text-xl font-semibold mb-3">{p2Name}</h3>
+				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+					<h3 className="text-xl font-bold mb-4 text-indigo-800">{p2Name}</h3>
 					{renderPokemonInfo("p2")}
 					{renderMoves("p2")}
 				</div>

@@ -1,5 +1,7 @@
 {
   "name": "pokemon-battling",
+  "description": "A simple app to battle Pokemon",
+  "author": "Lakshya Agarwal",
   "version": "0.1.0",
   "private": true,
   "scripts": {

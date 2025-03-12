@@ -9,7 +9,7 @@ export type PokemonWithMoves = {
 };
 
 /**
- * Generate a random Pokemon from Gen 1
+ * Generate a random Pokemon
  */
 export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 	const gens = new Generations(Dex);
@@ -48,6 +48,8 @@ export async function getRandomMovesForPokemon(
 		if (!learnsets) {
 			throw new Error(`No learnset data found for ${pokemon.name}`);
 		}
+
+		console.log(learnsets);
 
 		// Get all moves for this Pokemon
 		const availableMoves: string[] = [];
