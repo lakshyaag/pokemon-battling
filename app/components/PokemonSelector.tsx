@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Generations, type Specie } from "@pkmn/data";
+import { Teams } from "@pkmn/sim";
 import { Dex } from "@pkmn/dex";
 import { Sprites } from "@pkmn/img";
 import { GENERATION, TYPE_COLORS } from "@/lib/constants";
 import { getRandomMovesForPokemon } from "../utils/pokemonUtils";
+import { BattleService } from "../services/battle.service";
 import PokemonCard from "./PokemonCard";
 import {
 	Select,
@@ -29,13 +31,15 @@ export type PokemonData = Specie & {
  */
 export default function PokemonSelector() {
 	const router = useRouter();
-	const { 
-		setSelectedPokemon, 
-		setSelectedMoves, 
+	const {
+		setSelectedPokemon,
+		setSelectedMoves,
 		selectedMoves,
 		selectedPokemon,
 		setOpponentPokemon,
 		setOpponentMoves,
+		setP1Team,
+		setP2Team,
 	} = useBattleStore();
 	const [allPokemon, setAllPokemon] = useState<PokemonData[]>([]);
 	const [selectedPokemonId, setSelectedPokemonId] = useState<string>("");
@@ -122,20 +126,41 @@ export default function PokemonSelector() {
 
 	const handleStartBattle = useCallback(async () => {
 		if (!selectedPokemon) return;
-		
+
 		setIsStartingBattle(true);
 		try {
 			// Select a random opponent
-			const availablePokemon = allPokemon.filter(p => p.id !== selectedPokemon.id);
-			const randomOpponent = availablePokemon[Math.floor(Math.random() * availablePokemon.length)];
-			
+			const availablePokemon = allPokemon.filter(
+				(p) => p.id !== selectedPokemon.id,
+			);
+			const randomOpponent =
+				availablePokemon[Math.floor(Math.random() * availablePokemon.length)];
+
 			// Get moves for the opponent
 			const opponentMoves = await getRandomMovesForPokemon(randomOpponent);
-			
+
 			// Set opponent data
 			setOpponentPokemon(randomOpponent);
 			setOpponentMoves(opponentMoves);
-			
+
+			// Generate team strings for both players
+			// @ts-ignore
+			const p1Team = Teams.exportSet({
+				name: selectedPokemon.name,
+				species: selectedPokemon.baseSpecies,
+				moves: selectedMoves,
+			});
+
+			// @ts-ignore
+			const p2Team = Teams.exportSet({
+				name: randomOpponent.name,
+				species: randomOpponent.baseSpecies,
+				moves: opponentMoves,
+			});
+
+			setP1Team(p1Team);
+			setP2Team(p2Team);
+
 			// Navigate to battle page
 			router.push("/battle");
 		} catch (error) {
@@ -143,7 +168,16 @@ export default function PokemonSelector() {
 		} finally {
 			setIsStartingBattle(false);
 		}
-	}, [selectedPokemon, allPokemon, router, setOpponentPokemon, setOpponentMoves]);
+	}, [
+		selectedPokemon,
+		allPokemon,
+		setOpponentPokemon,
+		setOpponentMoves,
+		selectedMoves,
+		setP1Team,
+		setP2Team,
+		router,
+	]);
 
 	if (isLoading) {
 		return (
@@ -217,24 +251,12 @@ export default function PokemonSelector() {
 
 						<div className="flex gap-4">
 							<Button
-								onClick={() => getRandomMoves(selectedPokemonId)}
-								disabled={isLoadingMoves || !selectedPokemonId}
-								variant="secondary"
-								className="flex-1"
-							>
-								{isLoadingMoves ? (
-									<>
-										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										Generating moves...
-									</>
-								) : (
-									"Regenerate Moves"
-								)}
-							</Button>
-
-							<Button
 								onClick={handleStartBattle}
-								disabled={isStartingBattle || !selectedPokemonId || !selectedMoves.length}
+								disabled={
+									isStartingBattle ||
+									!selectedPokemonId ||
+									!selectedMoves.length
+								}
 								variant="default"
 								className="flex-1"
 							>
