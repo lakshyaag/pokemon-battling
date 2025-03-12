@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { PokemonWithMoves, getRandomPokemon } from "../utils/pokemonUtils";
+import { getRandomPokemon } from "../utils/pokemonUtils";
+import type { PokemonWithMoves } from "../utils/pokemonUtils";
 import BattleField from "../components/BattleField";
-import BattleEngine, { BattleState } from "@/components/BattleEngine";
+import BattleEngine from "../components/BattleEngine";
+import type { BattleState } from "../components/BattleEngine";
 
 /**
  * Page for displaying the battle interface with user's Pokemon and a random opponent

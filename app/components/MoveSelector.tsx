@@ -1,4 +1,5 @@
 import { useState } from "react";
+import MoveList from "./MoveList";
 
 type MoveSelectorProps = {
 	moves: string[];
@@ -10,6 +11,7 @@ type MoveSelectorProps = {
 
 /**
  * Component for selecting a move from a list of Pokémon moves
+ * Handles state management and delegates UI rendering to MoveList
  */
 export default function MoveSelector({
 	moves,
@@ -26,33 +28,13 @@ export default function MoveSelector({
 	};
 
 	return (
-		<div className={`p-4 ${className}`}>
-			<h4 className="font-medium mb-2">{title}:</h4>
-
-			{moves.length === 0 ? (
-				<p className="text-sm italic">No moves available</p>
-			) : (
-				<div className="grid grid-cols-2 gap-2">
-					{moves.map((move, index) => (
-						<button
-							key={index}
-							onClick={() => handleSelectMove(move)}
-							disabled={disabled}
-							className={`
-                py-2 px-3 rounded text-sm capitalize border
-                ${
-									selectedMove === move
-										? "bg-green-500 text-white border-green-600"
-										: "bg-white hover:bg-gray-100 border-gray-300"
-								}
-                ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-              `}
-						>
-							{move.replace(/-/g, " ")}
-						</button>
-					))}
-				</div>
-			)}
-		</div>
+		<MoveList
+			moves={moves}
+			selectedMove={selectedMove}
+			onSelectMove={handleSelectMove}
+			disabled={disabled}
+			title={title}
+			className={className}
+		/>
 	);
 }

@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { PokemonWithMoves } from "../utils/pokemonUtils";
+import type { PokemonWithMoves } from "../utils/pokemonUtils";
 import Pokemon from "./Pokemon";
-import MoveSelector from "./MoveSelector";
-import { BattleAction, BattleState } from "./BattleEngine";
+import type { BattleAction, BattleState } from "./BattleEngine";
 
 type BattleFieldProps = {
 	userPokemon: PokemonWithMoves;
@@ -35,7 +34,7 @@ export default function BattleField({
 		setUserSelectedMove("");
 		setOpponentSelectedMove("");
 		setAnimationComplete(false);
-	}, [userPokemon, opponentPokemon]);
+	}, []);
 
 	// Start animation when battle completes
 	useEffect(() => {
@@ -79,8 +78,8 @@ export default function BattleField({
 				<h3 className="text-xl font-bold mb-4 text-center">Battle Results</h3>
 
 				<div className="space-y-4">
-					{battleState.actions.map((action: BattleAction, index: number) => (
-						<div key={index} className="p-3 bg-white rounded shadow">
+					{battleState.actions.map((action: BattleAction, idx: number) => (
+						<div key={`${action.pokemon}-${action.move}-${idx}`} className="p-3 bg-white rounded shadow">
 							<p>{action.result}</p>
 							{action.effectiveness && (
 								<p
@@ -125,36 +124,31 @@ export default function BattleField({
 	return (
 		<div className="w-full max-w-4xl mx-auto">
 			<div className="grid md:grid-cols-2 gap-8">
-				{/* User Pokemon Side */}
-				<div>
-					<Pokemon pokemon={userPokemon} side="user" />
+				{/* User Pokemon Side with integrated moves */}
+				<Pokemon 
+					pokemon={userPokemon} 
+					side="user" 
+					showMoves={true}
+					selectedMove={userSelectedMove}
+					onSelectMove={handleUserMoveSelect}
+					disabledMoves={battleInProgress || battleComplete}
+				/>
 
-					<MoveSelector
-						moves={userPokemon.moves}
-						onSelectMove={handleUserMoveSelect}
-						disabled={battleInProgress || battleComplete}
-						title="Your Moves"
-						className="mt-4"
-					/>
-				</div>
-
-				{/* Opponent Pokemon Side */}
-				<div>
-					<Pokemon pokemon={opponentPokemon} side="opponent" />
-
-					<MoveSelector
-						moves={opponentPokemon.moves}
-						onSelectMove={handleOpponentMoveSelect}
-						disabled={battleInProgress || battleComplete}
-						title="Opponent Moves"
-						className="mt-4"
-					/>
-				</div>
+				{/* Opponent Pokemon Side with integrated moves */}
+				<Pokemon 
+					pokemon={opponentPokemon} 
+					side="opponent" 
+					showMoves={true}
+					selectedMove={opponentSelectedMove}
+					onSelectMove={handleOpponentMoveSelect}
+					disabledMoves={battleInProgress || battleComplete}
+				/>
 			</div>
 
 			{/* Battle Controls */}
 			<div className="mt-8 flex justify-center space-x-4">
 				<button
+					type="button"
 					onClick={handleStartBattle}
 					disabled={
 						!userSelectedMove ||
@@ -178,6 +172,7 @@ export default function BattleField({
 				</button>
 
 				<button
+					type="button"
 					onClick={handleReset}
 					disabled={battleInProgress}
 					className={`

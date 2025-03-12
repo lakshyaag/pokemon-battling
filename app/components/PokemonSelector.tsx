@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { Generations } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
 import { Sprites } from "@pkmn/img";
+import { GENERATION } from "@/lib/constants";
+import { getRandomMovesForPokemon } from "../utils/pokemonUtils";
+import Pokemon from "./Pokemon";
 
 type PokemonSelectorProps = {
 	onSelect: (pokemon: string, moves: string[]) => void;
@@ -30,15 +33,14 @@ export default function PokemonSelector({ onSelect }: PokemonSelectorProps) {
 			try {
 				const gens = new Generations(Dex);
 
-				// Get Gen 1 data
-				const gen1 = gens.get(1);
+				const gen = gens.get(GENERATION);
 
-				// Get all Gen 1 Pokemon
-				const pokemonList = Array.from(gen1.species)
+				// Get all Pokemon
+				const pokemonList = Array.from(gen.species)
 					.map((species) => {
 						// Get sprite URL using @pkmn/img
 						const spriteUrl = Sprites.getPokemon(species.name, {
-							gen: 1,
+							gen: GENERATION,
 						}).url;
 
 						return {
@@ -62,60 +64,11 @@ export default function PokemonSelector({ onSelect }: PokemonSelectorProps) {
 	}, []);
 
 	const getRandomMoves = async (pokemonId: string) => {
-		setIsLoadingMoves(true);
 		try {
-			// Initialize the generations using the Dex
-			const gens = new Generations(Dex);
+			const moves = await getRandomMovesForPokemon(pokemonId);
 
-			// Get Gen 1 data
-			const gen1 = gens.get(1);
-
-			// Get learnset data for the selected Pokemon
-			const pokemon = gen1.species.get(pokemonId);
-			if (!pokemon) {
-				throw new Error(`Pokemon ${pokemonId} not found`);
-			}
-
-			// Wait for the learnsets data to load
-			const learnsets = await gen1.learnsets.get(pokemon.id);
-
-			if (!learnsets) {
-				throw new Error(`No learnset data found for ${pokemon.name}`);
-			}
-
-			// Get all moves for this Pokemon in Gen 1
-			const availableMoves: string[] = [];
-
-			// Filter for gen1 moves (entries with '1L', '1M', '1T', etc. in their source)
-			for (const moveId in learnsets.learnset) {
-				const sources = learnsets.learnset[moveId];
-				if (sources.some((source) => source.startsWith("1"))) {
-					// Get the actual move object to display proper name
-					const move = gen1.moves.get(moveId);
-					if (move) {
-						availableMoves.push(move.name);
-					}
-				}
-			}
-
-			// If we have less than 4 moves, use all of them
-			// Otherwise, randomly select 4 moves
-			let selectedMoves: string[];
-			if (availableMoves.length <= 4) {
-				selectedMoves = [...availableMoves];
-			} else {
-				selectedMoves = [];
-				const movesCopy = [...availableMoves];
-
-				while (selectedMoves.length < 4 && movesCopy.length > 0) {
-					const randomIndex = Math.floor(Math.random() * movesCopy.length);
-					selectedMoves.push(movesCopy[randomIndex]);
-					movesCopy.splice(randomIndex, 1);
-				}
-			}
-
-			setSelectedMoves(selectedMoves);
-			onSelect(pokemonId, selectedMoves);
+			setSelectedMoves(moves);
+			onSelect(pokemonId, moves);
 			setIsLoadingMoves(false);
 		} catch (error) {
 			console.error("Error getting moves:", error);
@@ -142,6 +95,11 @@ export default function PokemonSelector({ onSelect }: PokemonSelectorProps) {
 	if (isLoading) {
 		return <div className="p-4 text-center">Loading Pokemon data...</div>;
 	}
+
+	// Find the selected Pokemon object
+	const selectedPokemonData = selectedPokemon
+		? allPokemon.find((p) => p.id === selectedPokemon)
+		: null;
 
 	return (
 		<div className="w-full p-4">
@@ -171,45 +129,20 @@ export default function PokemonSelector({ onSelect }: PokemonSelectorProps) {
 				</div>
 			</div>
 
-			{selectedPokemon && (
+			{selectedPokemonData && (
 				<div className="mt-6">
-					<div className="flex items-center mb-4">
-						{allPokemon.find((p) => p.id === selectedPokemon) && (
-							<img
-								src={allPokemon.find((p) => p.id === selectedPokemon)?.sprite}
-								alt={selectedPokemon}
-								className="w-16 h-16 mr-4"
-								onError={(e) => {
-									const target = e.target as HTMLImageElement;
-									target.src =
-										"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png";
-								}}
-							/>
-						)}
-						<h3 className="text-lg font-semibold">
-							{allPokemon
-								.find((p) => p.id === selectedPokemon)
-								?.name.replace(/-/g, " ")}
-						</h3>
-					</div>
-
-					<div>
-						<h4 className="font-medium mb-2">Random Moves:</h4>
-						{isLoadingMoves ? (
-							<p className="text-sm italic">Loading moves...</p>
-						) : (
-							<ul className="list-disc pl-5">
-								{selectedMoves.map((move, index) => (
-									<li key={index} className="text-sm mb-1 capitalize">
-										{move.replace(/-/g, " ")}
-									</li>
-								))}
-								{selectedMoves.length === 0 && (
-									<li className="text-sm italic">No moves available</li>
-								)}
-							</ul>
-						)}
-					</div>
+					{/* Use the Pokemon component to display the selected Pokemon with moves */}
+					<Pokemon
+						pokemon={{
+							id: selectedPokemonData.id,
+							name: selectedPokemonData.name,
+							sprite: selectedPokemonData.sprite,
+							moves: selectedMoves,
+						}}
+						className="mb-4"
+						showMoves={true}
+						disabledMoves={isLoadingMoves}
+					/>
 
 					<button
 						type="button"
