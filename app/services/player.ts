@@ -1,38 +1,14 @@
-import type { Pokemon } from "@pkmn/client";
 import type { ObjectReadWriteStream } from "@pkmn/streams";
-
-/**
- * Interface for move data
- */
-export interface MoveData {
-    id: string;
-    move: string;
-    pp: number;
-    maxpp: number;
-    disabled?: boolean;
-}
-
-export interface BattleRequest {
-    active: {
-        moves: MoveData[];
-    }[];
-    side: {
-        id: string;
-        name: string;
-        pokemon: Pokemon[];
-    };
-}
-
+import type { PlayerRequest } from "./battle-types";
 /**
  * Class representing a manual player in a Pokémon battle
  */
-class ManualPlayer {
+export class ManualPlayer {
     stream: ObjectReadWriteStream<string>;
     log: string[] = [];
     debug: boolean;
-    currentRequest: BattleRequest | null = null;
     playerName: string;
-    onRequestReceived: (request: BattleRequest) => void;
+    onRequestReceived: (request: PlayerRequest) => void;
 
     /**
      * Create a manual player
@@ -44,8 +20,8 @@ class ManualPlayer {
     constructor(
         playerStream: ObjectReadWriteStream<string>,
         debug = false,
-        playerName = 'Unknown',
-        onRequestReceived: (request: BattleRequest) => void = () => { }
+        playerName = "Unknown",
+        onRequestReceived: (request: PlayerRequest) => void = () => { },
     ) {
         this.stream = playerStream;
         this.debug = debug;
@@ -75,7 +51,7 @@ class ManualPlayer {
     receive(chunk: string): void {
         if (this.debug) console.log(`${this.playerName} received:`, chunk);
 
-        for (const line of chunk.split('\n')) {
+        for (const line of chunk.split("\n")) {
             this.receiveLine(line);
         }
     }
@@ -86,13 +62,17 @@ class ManualPlayer {
      */
     receiveLine(line: string): void {
         if (this.debug) console.log(`${this.playerName} line:`, line);
-        if (!line.startsWith('|')) return;
+        if (!line.startsWith("|")) return;
 
-        const [cmd, rest] = line.slice(1).split('|', 1)[0] === ''
-            ? ['', line.slice(1)]
-            : [line.slice(1).split('|', 1)[0], line.slice(line.indexOf('|', 1) + 1)];
+        const [cmd, rest] =
+            line.slice(1).split("|", 1)[0] === ""
+                ? ["", line.slice(1)]
+                : [
+                    line.slice(1).split("|", 1)[0],
+                    line.slice(line.indexOf("|", 1) + 1),
+                ];
 
-        if (cmd === 'request') {
+        if (cmd === "request") {
             try {
                 const request = JSON.parse(rest);
                 this.receiveRequest(request);
@@ -102,7 +82,7 @@ class ManualPlayer {
             return;
         }
 
-        if (cmd === 'error') {
+        if (cmd === "error") {
             this.receiveError(new Error(rest));
             return;
         }
@@ -119,15 +99,14 @@ class ManualPlayer {
 
         // If we made an unavailable choice we will receive a followup request to
         // allow us the opportunity to correct our decision.
-        if (error.message.startsWith('[Unavailable choice]')) return;
+        if (error.message.startsWith("[Unavailable choice]")) return;
     }
 
     /**
      * Handle a request
      * @param request - The request
      */
-    receiveRequest(request: BattleRequest): void {
-        this.currentRequest = request;
+    receiveRequest(request: PlayerRequest): void {
         if (this.debug) console.log(`${this.playerName} received request:`, request);
         this.onRequestReceived(request);
     }

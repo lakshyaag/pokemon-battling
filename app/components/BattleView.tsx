@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { BattleService } from "../services/battle.service";
+import type { BattleState } from "../services/battle-types";
 import type { Pokemon } from "@pkmn/client";
-import type { BattleRequest } from "../services/player";
+import { BattleEngine } from "../services/battle-engine";
 import { TYPE_COLORS } from "@/lib/constants";
 import BattleMoveButton from "./BattleMoveButton";
 import { Badge } from "./ui/badge";
@@ -20,28 +20,6 @@ interface BattleComponentProps {
 }
 
 /**
- * Interface for battle state
- */
-interface BattleState {
-	turn: number;
-	p1: {
-		active: Pokemon | null;
-		team: Pokemon[];
-		request: BattleRequest | null;
-		selectedMove: number | null;
-	};
-	p2: {
-		active: Pokemon | null;
-		team: Pokemon[];
-		request: BattleRequest | null;
-		selectedMove: number | null;
-	};
-	weather: string;
-	status: string;
-	logs: string[];
-}
-
-/**
  * Component for displaying and interacting with a Pokémon battle
  */
 export default function BattleComponent({
@@ -51,65 +29,82 @@ export default function BattleComponent({
 	p1Team,
 	p2Team,
 }: BattleComponentProps) {
-	const battleServiceRef = useRef<BattleService | null>(null);
+	const battleEngineRef = useRef<BattleEngine | null>(null);
 	const [battleState, setBattleState] = useState<BattleState>({
 		turn: 0,
-		p1: { active: null, team: [], request: null, selectedMove: null },
-		p2: { active: null, team: [], request: null, selectedMove: null },
+		p1: {
+			name: p1Name,
+			active: null,
+			team: [],
+			request: null,
+			selectedMove: null,
+		},
+		p2: {
+			name: p2Name,
+			active: null,
+			team: [],
+			request: null,
+			selectedMove: null,
+		},
 		weather: "none",
 		status: "Initializing battle...",
 		logs: [],
+		isComplete: false,
+		winner: null,
 	});
 	const [isInitialized, setIsInitialized] = useState(false);
 
-	// Initialize battle service
+	// Initialize battle engine
 	useEffect(() => {
 		if (!isInitialized) {
-			const battleService = new BattleService({
+			const battleEngine = new BattleEngine({
 				format,
 				p1Name,
 				p2Name,
 				p1Team,
 				p2Team,
-				onBattleUpdate: (state) => {
+				onBattleUpdate: (state: BattleState) => {
 					setBattleState(state);
 				},
 			});
 
-			battleServiceRef.current = battleService;
+			// Subscribe to state updates
+			battleEngine.on("stateUpdate", (state) => {
+				setBattleState(state);
+			});
+
+			battleEngineRef.current = battleEngine;
 			setIsInitialized(true);
 
 			// Start the battle
-			battleService.startBattle(p1Team, p2Team);
+			battleEngine.startBattle(p1Team, p2Team);
+
+			// Cleanup function
+			return () => {
+				// Clean up any subscriptions or resources
+			};
 		}
 	}, [format, p1Name, p2Name, p1Team, p2Team, isInitialized]);
 
 	// Handle move selection for player 1
 	const handleP1MoveSelect = (moveIndex: number) => {
-		setBattleState((prev) => ({
-			...prev,
-			p1: { ...prev.p1, selectedMove: moveIndex },
-		}));
-		battleServiceRef.current?.makeP1Move(moveIndex);
+		if (!battleEngineRef.current) return;
+
+		battleEngineRef.current.processPlayerDecision("p1", {
+			type: "move",
+			moveIndex,
+		});
 	};
 
 	// Handle move selection for player 2
 	const handleP2MoveSelect = (moveIndex: number) => {
-		setBattleState((prev) => ({
-			...prev,
-			p2: { ...prev.p2, selectedMove: moveIndex },
-		}));
-		battleServiceRef.current?.makeP2Move(moveIndex);
-	};
+		if (!battleEngineRef.current) return;
 
-	// Reset selected moves after each turn
-	useEffect(() => {
-		setBattleState((prev) => ({
-			...prev,
-			p1: { ...prev.p1, selectedMove: null },
-			p2: { ...prev.p2, selectedMove: null },
-		}));
-	}, []);
+		battleEngineRef.current.processPlayerDecision("p2", {
+			type: "move",
+			moveIndex,
+		});
+	};
 
 	// Parse HP and status from condition string
 	const parseCondition = (pokemon?: Pokemon) => {
@@ -131,10 +126,10 @@ export default function BattleComponent({
 
 		const sprite = getSprite(pokemon, player);
 		const item = pokemonFromRequest?.item
-			? battleServiceRef.current?.getItem(pokemonFromRequest.item)
+			? battleEngineRef.current?.getItem(pokemonFromRequest.item)
 			: null;
 		const ability = pokemonFromRequest?.baseAbility
-			? battleServiceRef.current?.getAbility(pokemonFromRequest.baseAbility)
+			? battleEngineRef.current?.getAbility(pokemonFromRequest.baseAbility)
 			: null;
 
 		// Extract HP information from condition
@@ -247,8 +242,8 @@ export default function BattleComponent({
 				<h4 className="text-md font-semibold mb-3">Available Moves</h4>
 				<div className="grid grid-cols-2 gap-2">
 					{moves.map((move, index) => {
-						// Get move details if battleService is available
-						const moveData = battleServiceRef.current?.getMoveData(move.id);
+						// Get move details if battleEngine is available
+						const moveData = battleEngineRef.current?.getMoveData(move.id);
 						if (!moveData) {
 							return null;
 						}
