@@ -1,13 +1,14 @@
 import React from "react";
 import type { Pokemon, Battle } from "@pkmn/client";
-import type { PlayerRequest, MoveData } from "@/services/battle-types";
+import type { PlayerRequest, PlayerDecision } from "@/services/battle-types";
 import type { BattleEngine } from "@/services/battle-engine";
 import type { GenerationNum } from "@pkmn/types";
-import { Card, CardContent } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { TypeBadge } from "./ui/type-badge";
 import BattleMoveButton from "./BattleMoveButton";
+import SwitchButton from "./SwitchButton";
 import { getSprite, parseCondition, getHPColor } from "@/utils/pokemonUtils";
 import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -18,8 +19,8 @@ interface PlayerDisplayProps {
 	request: PlayerRequest | null;
 	generation: GenerationNum;
 	engine: BattleEngine | null;
-	selectedMove: number | null;
-	onMoveSelect: (player: "p1" | "p2", moveIndex: number | null) => void;
+	selectedDecision: PlayerDecision | null;
+	onDecision: (player: "p1" | "p2", decision: PlayerDecision | null) => void;
 }
 
 export default function PlayerDisplay({
@@ -28,8 +29,8 @@ export default function PlayerDisplay({
 	request,
 	generation,
 	engine,
-	selectedMove,
-	onMoveSelect,
+	selectedDecision,
+	onDecision,
 }: PlayerDisplayProps) {
 	if (!battle || !engine) {
 		return (
@@ -136,8 +137,176 @@ export default function PlayerDisplay({
 		);
 	};
 
-	const renderMovesSection = () => {
-		// Show waiting message if explicitly waiting for opponent
+	const renderActionSection = () => {
+		// Check if a switch is forced for the first active slot
+		const needsToSwitch = request?.forceSwitch?.[0] === true;
+		// Check if moves are available (request exists, not waiting, has moves)
+		const canMove = request && !request.wait && request.active?.[0]?.moves && request.active[0].moves.length > 0;
+		// Check if trapped
+		const isTrapped = request?.active?.[0]?.trapped === true;
+		// Check if can switch voluntarily
+		const canSwitch = !isTrapped && request?.active?.[0]?.canSwitch !== false;
+
+		const renderSwitchOptions = (showTitle = true) => {
+			if (!request) return null;
+			
+			const switchOptions = request.side.pokemon.filter(
+				(p) => !p.active && p.condition !== "0 fnt" && !p.reviving
+			);
+
+			if (switchOptions.length === 0) {
+				return (
+					<div className="text-center p-4 text-destructive">
+						No Pokémon available to switch in!
+					</div>
+				);
+			}
+
+			return (
+				<div className="space-y-2">
+					{showTitle && (
+						<h4 className="font-semibold text-center mb-2">
+							{needsToSwitch ? (
+								<span className="text-destructive">Must Switch!</span>
+							) : (
+								"Switch to"
+							)}
+						</h4>
+					)}
+					{switchOptions.map((pokemonInfo) => {
+						// Find the original index in the full request.side.pokemon array
+						const originalIndex = request.side.pokemon.findIndex(
+							(p) => p.ident === pokemonInfo.ident
+						);
+						const switchIndex = originalIndex + 1; // 1-based index for protocol
+
+						if (originalIndex === -1) return null;
+
+						const isSelected = 
+							selectedDecision?.type === "switch" && 
+							selectedDecision.pokemonIndex === switchIndex;
+
+						return (
+							<SwitchButton
+								key={pokemonInfo.ident}
+								pokemonInfo={pokemonInfo}
+								onClick={() => {
+									if (isSelected) {
+										onDecision(player, null);
+									} else {
+										onDecision(player, {
+											type: "switch",
+											pokemonIndex: switchIndex,
+										});
+									}
+								}}
+								disabled={isTrapped}
+							/>
+						);
+					})}
+				</div>
+			);
+		};
+
+		// If forced to switch, only show switch options
+		if (needsToSwitch) {
+			return renderSwitchOptions();
+		}
+
+		// Show moves and optional switch button
+		if (canMove) {
+			const moves = request!.active![0].moves;
+			const isSelectedMove = selectedDecision?.type === "move";
+			const isSelectedSwitch = selectedDecision?.type === "switch";
+			const [showingSwitchOptions, setShowingSwitchOptions] = React.useState(false);
+			
+			return (
+				<div className="space-y-3">
+					{!showingSwitchOptions ? (
+						<>
+							<div className="grid grid-cols-2 gap-2.5">
+								{moves.map((moveInfo, index) => {
+									const moveData = engine.getMoveData(moveInfo.id);
+									if (!moveData) return null;
+
+									const isDisabled = moveInfo.disabled;
+									const isButtonDisabled = isDisabled || moveInfo.pp <= 0;
+
+									return (
+										<BattleMoveButton
+											key={`${moveInfo.id}-${index}`}
+											move={moveData}
+											pp={moveInfo.pp}
+											maxPp={moveInfo.maxpp}
+											disabled={isButtonDisabled || isSelectedSwitch}
+											isDisabled={isDisabled}
+											isSelected={isSelectedMove && selectedDecision.moveIndex === index + 1}
+											onClick={() => {
+												if (isButtonDisabled) return;
+												if (isSelectedMove && selectedDecision.moveIndex === index + 1) {
+													onDecision(player, null);
+												} else {
+													onDecision(player, {
+														type: "move",
+														moveIndex: index + 1,
+													});
+												}
+											}}
+										/>
+									);
+								})}
+							</div>
+							{canSwitch && (
+								<div className="flex justify-end gap-2">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setShowingSwitchOptions(true)}
+										disabled={isSelectedMove}
+									>
+										Switch Pokémon
+									</Button>
+									{selectedDecision && (
+										<Button
+											variant="ghost"
+											size="sm"
+											className="text-destructive hover:text-destructive/90"
+											onClick={() => onDecision(player, null)}
+										>
+											Cancel Selection
+										</Button>
+									)}
+								</div>
+							)}
+						</>
+					) : (
+						<>
+							{renderSwitchOptions(false)}
+							<div className="flex justify-end gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setShowingSwitchOptions(false)}
+								>
+									Show Moves
+								</Button>
+								{selectedDecision && (
+									<Button
+										variant="ghost"
+										size="sm"
+										className="text-destructive hover:text-destructive/90"
+										onClick={() => onDecision(player, null)}
+									>
+										Cancel Selection
+									</Button>
+								)}
+							</div>
+						</>
+					)}
+				</div>
+			);
+		}
+
 		if (request?.wait) {
 			return (
 				<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
@@ -146,59 +315,9 @@ export default function PlayerDisplay({
 			);
 		}
 
-		const moves = request?.active?.[0]?.moves;
-		if (!moves || moves.length === 0) {
-			return (
-				<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
-					No moves available (e.g., Struggle).
-				</div>
-			);
-		}
-
 		return (
-			<div className="space-y-3">
-				<div className="grid grid-cols-2 gap-2.5">
-					{moves.map((moveInfo, index) => {
-						const moveData = engine.getMoveData(moveInfo.id);
-						if (!moveData) return null;
-
-						const isDisabled = moveInfo.disabled;
-						const isButtonDisabled = isDisabled || moveInfo.pp <= 0;
-
-						return (
-							<BattleMoveButton
-								key={`${moveInfo.id}-${index}`}
-								move={moveData}
-								pp={moveInfo.pp}
-								maxPp={moveInfo.maxpp}
-								disabled={isButtonDisabled}
-								isDisabled={isDisabled}
-								isSelected={selectedMove === index + 1}
-								onClick={() => {
-									if (isButtonDisabled) return;
-									// If this move is already selected, deselect it
-									if (selectedMove === index + 1) {
-										onMoveSelect(player, null);
-									} else {
-										onMoveSelect(player, index + 1);
-									}
-								}}
-							/>
-						);
-					})}
-				</div>
-				{selectedMove !== null && (
-					<div className="flex justify-end">
-						<Button
-							variant="ghost"
-							size="sm"
-							className="text-destructive hover:text-destructive/90"
-							onClick={() => onMoveSelect(player, null)}
-						>
-							Cancel Selection
-						</Button>
-					</div>
-				)}
+			<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
+				No action required.
 			</div>
 		);
 	};
@@ -209,7 +328,12 @@ export default function PlayerDisplay({
 				<CardContent className="pt-5 pb-4">{renderInfo()}</CardContent>
 			</Card>
 			<Card>
-				<CardContent className="pt-4 pb-4">{renderMovesSection()}</CardContent>
+				<CardHeader className="py-2 px-4 border-b">
+					<CardTitle className="text-base font-medium">
+						{request?.forceSwitch?.[0] ? "Choose Switch" : "Choose Action"}
+					</CardTitle>
+				</CardHeader>
+				<CardContent className="pt-4 pb-4">{renderActionSection()}</CardContent>
 			</Card>
 		</div>
 	);

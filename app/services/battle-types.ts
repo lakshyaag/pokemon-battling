@@ -56,6 +56,9 @@ export interface PlayerRequest {
             target: string;
             disabled?: boolean;
         }>;
+        trapped?: boolean;
+        maybeTrapped?: boolean;
+        canSwitch?: boolean | number[];
     }[];
     side: {
         name: string;
@@ -77,16 +80,19 @@ export interface PlayerRequest {
             item: string;
             pokeball: string;
             ability: string;
+            reviving?: boolean;
+            fainted?: boolean;
         }>;
     };
-    rqid: number;
+    forceSwitch?: boolean[];
     wait?: boolean;
+    rqid?: number;
 }
 
 /**
- * Interface for player decisions
+ * Interface for player move decisions
  */
-export interface PlayerDecision {
+export interface MoveDecision {
     type: "move";
     moveIndex: number;
 }

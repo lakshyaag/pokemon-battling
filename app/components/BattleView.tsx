@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import type { BattleState, PlayerRequest } from "../services/battle-types";
+import type { BattleState, PlayerRequest, PlayerDecision } from "../services/battle-types";
 import type { Battle } from "@pkmn/client";
 import type { BattleEngine } from "../services/battle-engine";
 import { Badge } from "./ui/badge";
@@ -32,7 +32,10 @@ export default function BattleView({ battleId }: BattleViewProps) {
 	const [retryCount, setRetryCount] = useState(0);
 	const maxRetries = 3;
 	const logScrollAreaRef = useRef<HTMLDivElement>(null);
-	const [selectedMoves, setSelectedMoves] = useState<{ p1: number | null; p2: number | null }>({
+	const [selectedDecisions, setSelectedDecisions] = useState<{
+		p1: PlayerDecision | null;
+		p2: PlayerDecision | null;
+	}>({
 		p1: null,
 		p2: null,
 	});
@@ -119,39 +122,30 @@ export default function BattleView({ battleId }: BattleViewProps) {
 	}, [viewState?.logs]); // Trigger scroll on log changes
 
 	// Handle player decisions (forward to engine)
-	const handlePlayerDecision = (player: "p1" | "p2", moveIndex: number | null) => {
+	const handlePlayerDecision = (
+		player: "p1" | "p2",
+		decision: PlayerDecision | null,
+	) => {
 		if (!battleEngineRef.current || viewState?.battle?.ended) return;
 
-		setSelectedMoves((prev) => ({
+		setSelectedDecisions((prev) => ({
 			...prev,
-			[player]: moveIndex,
+			[player]: decision,
 		}));
 
-		// Only execute the turn if both players have selected their moves
-		if (moveIndex !== null && player === "p2" && selectedMoves.p1 !== null) {
-			// Execute both moves
-			battleEngineRef.current.processPlayerDecision("p1", {
-				type: "move",
-				moveIndex: selectedMoves.p1,
-			});
-			battleEngineRef.current.processPlayerDecision("p2", {
-				type: "move",
-				moveIndex: moveIndex,
-			});
+		// Only execute the turn if both players have made their decisions
+		if (decision !== null && player === "p2" && selectedDecisions.p1 !== null) {
+			// Execute both decisions
+			battleEngineRef.current.processPlayerDecision("p1", selectedDecisions.p1);
+			battleEngineRef.current.processPlayerDecision("p2", decision);
 			// Reset selections
-			setSelectedMoves({ p1: null, p2: null });
-		} else if (moveIndex !== null && player === "p1" && selectedMoves.p2 !== null) {
-			// Execute both moves
-			battleEngineRef.current.processPlayerDecision("p1", {
-				type: "move",
-				moveIndex: moveIndex,
-			});
-			battleEngineRef.current.processPlayerDecision("p2", {
-				type: "move",
-				moveIndex: selectedMoves.p2,
-			});
+			setSelectedDecisions({ p1: null, p2: null });
+		} else if (decision !== null && player === "p1" && selectedDecisions.p2 !== null) {
+			// Execute both decisions
+			battleEngineRef.current.processPlayerDecision("p1", decision);
+			battleEngineRef.current.processPlayerDecision("p2", selectedDecisions.p2);
 			// Reset selections
-			setSelectedMoves({ p1: null, p2: null });
+			setSelectedDecisions({ p1: null, p2: null });
 		}
 	};
 
@@ -232,6 +226,8 @@ export default function BattleView({ battleId }: BattleViewProps) {
 		ended?: boolean;
 	};
 
+	console.log(battle);
+
 	return (
 		<div className="flex flex-col w-full max-w-7xl mx-auto space-y-4">
 			{/* Battle End State Banner */}
@@ -264,8 +260,8 @@ export default function BattleView({ battleId }: BattleViewProps) {
 						request={viewState.p1Request}
 						generation={generation}
 						engine={battleEngineRef.current}
-						selectedMove={selectedMoves.p1}
-						onMoveSelect={handlePlayerDecision}
+						selectedDecision={selectedDecisions.p1}
+						onDecision={handlePlayerDecision}
 					/>
 				</div>
 
@@ -280,8 +276,8 @@ export default function BattleView({ battleId }: BattleViewProps) {
 						request={viewState.p2Request}
 						generation={generation}
 						engine={battleEngineRef.current}
-						selectedMove={selectedMoves.p2}
-						onMoveSelect={handlePlayerDecision}
+						selectedDecision={selectedDecisions.p2}
+						onDecision={handlePlayerDecision}
 					/>
 				</div>
 			</div>

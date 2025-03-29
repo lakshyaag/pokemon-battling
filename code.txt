@@ -447,43 +447,42 @@ export async function getRandomMovesForPokemon(
 export function getSprite(
 	pokemon: Pokemon,
 	player: "p1" | "p2",
-	generation: number = 3,
+	generation: GenerationNum,
 ): string {
-	// Get species name in the format expected by @pkmn/img
 	const species = pokemon.speciesForme.toLowerCase();
+	const graphics = getGraphics(generation);
 
-	// Get sprite options
 	const options = {
-		gen: generation,
+		gen: graphics,
 		shiny: pokemon.shiny,
 		gender: pokemon.gender,
 		side: player,
-		mod: "ani", // Use animated sprites
 	};
 
-	// Get sprite URL using static method
 	return Sprites.getPokemon(species, options).url;
 }
 
 /**
- * Parse HP and status from condition string
+ * Parse a Pokémon's HP and status information
  */
-export function parseCondition(pokemon?: Pokemon | null) {
-	if (!pokemon) return { currentHP: 0, maxHP: 0, status: "" };
-
-	const currentHP = pokemon.hp;
-	const maxHP = pokemon.maxhp;
-	const status = pokemon.status;
-
-	return { currentHP, maxHP, status };
+export function parseCondition(pokemon: Pokemon) {
+	return {
+		currentHP: pokemon.hp || 0,
+		maxHP: pokemon.maxhp || 0,
+		status: pokemon.status || null,
+	};
 }
 
 /**
- * Get HP bar color based on percentage
+ * Get the appropriate Tailwind CSS color class for an HP percentage
  */
-export function getHPColor(percentage: number): string {
-	if (percentage > 50) return "bg-green-500";
-	if (percentage > 20) return "bg-yellow-500";
+export function getHPColor(hpPercentage: number): string {
+	if (hpPercentage > 50) {
+		return "bg-emerald-500";
+	}
+	if (hpPercentage > 20) {
+		return "bg-yellow-500";
+	}
 	return "bg-red-500";
 }
 
@@ -497,46 +496,63 @@ import { cn } from "@/lib/utils";
 import { TypeBadge } from "./ui/type-badge";
 import { cva } from "class-variance-authority";
 import type { TypeName } from "@pkmn/types";
+import type { Move } from "@pkmn/dex";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Separator } from "./ui/separator";
 
 interface BattleMoveButtonProps {
-	moveId: string;
-	name: string;
-	type: string;
+	move: Move;
 	pp: number;
 	maxPp: number;
 	disabled?: boolean;
 	isDisabled?: boolean;
-	disabledReason?: string;
+	isSelected?: boolean;
 	onClick: () => void;
 }
 
+// Variants for button background based on type
 const moveButtonVariants = cva(
-	"relative w-full min-h-[5rem] p-3 flex flex-col justify-between overflow-hidden transition-all duration-200 rounded-xl border-2 shadow-sm",
+	"relative w-full min-h-[5rem] h-full p-3 flex flex-col justify-between overflow-hidden transition-all duration-200 rounded-lg border shadow-sm hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
 	{
 		variants: {
 			type: {
-				normal: "bg-gray-50/80 hover:bg-gray-100/80 border-gray-200",
-				fire: "bg-red-50/80 hover:bg-red-100/80 border-red-200",
-				water: "bg-blue-50/80 hover:bg-blue-100/80 border-blue-200",
-				electric: "bg-yellow-50/80 hover:bg-yellow-100/80 border-yellow-200",
-				grass: "bg-emerald-50/80 hover:bg-emerald-100/80 border-emerald-200",
-				ice: "bg-cyan-50/80 hover:bg-cyan-100/80 border-cyan-200",
-				fighting: "bg-red-100/80 hover:bg-red-200/80 border-red-300",
-				poison: "bg-purple-50/80 hover:bg-purple-100/80 border-purple-200",
-				ground: "bg-amber-50/80 hover:bg-amber-100/80 border-amber-200",
-				flying: "bg-sky-50/80 hover:bg-sky-100/80 border-sky-200",
-				psychic: "bg-pink-50/80 hover:bg-pink-100/80 border-pink-200",
-				bug: "bg-lime-50/80 hover:bg-lime-100/80 border-lime-200",
-				rock: "bg-stone-50/80 hover:bg-stone-100/80 border-stone-200",
-				ghost: "bg-purple-100/80 hover:bg-purple-200/80 border-purple-300",
-				dragon: "bg-violet-50/80 hover:bg-violet-100/80 border-violet-200",
-				dark: "bg-neutral-100/80 hover:bg-neutral-200/80 border-neutral-300",
-				steel: "bg-slate-50/80 hover:bg-slate-100/80 border-slate-200",
-				fairy: "bg-pink-50/80 hover:bg-pink-100/80 border-pink-200",
+				normal:
+					"bg-gray-100/50 hover:bg-gray-100 border-gray-200 dark:bg-gray-800/30 dark:hover:bg-gray-800/60 dark:border-gray-700",
+				fire: "bg-red-100/50 hover:bg-red-100 border-red-200 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:border-red-800/50",
+				water:
+					"bg-blue-100/50 hover:bg-blue-100 border-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:border-blue-800/50",
+				electric:
+					"bg-yellow-100/50 hover:bg-yellow-100 border-yellow-200 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/40 dark:border-yellow-800/50",
+				grass:
+					"bg-emerald-100/50 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 dark:border-emerald-800/50",
+				ice: "bg-cyan-100/50 hover:bg-cyan-100 border-cyan-200 dark:bg-cyan-900/20 dark:hover:bg-cyan-900/40 dark:border-cyan-800/50",
+				fighting:
+					"bg-red-200/50 hover:bg-red-200 border-red-300 dark:bg-red-950/20 dark:hover:bg-red-950/40 dark:border-red-800/50",
+				poison:
+					"bg-purple-100/50 hover:bg-purple-100 border-purple-200 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 dark:border-purple-800/50",
+				ground:
+					"bg-amber-100/50 hover:bg-amber-100 border-amber-200 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 dark:border-amber-800/50",
+				flying:
+					"bg-sky-100/50 hover:bg-sky-100 border-sky-200 dark:bg-sky-900/20 dark:hover:bg-sky-900/40 dark:border-sky-800/50",
+				psychic:
+					"bg-pink-100/50 hover:bg-pink-100 border-pink-200 dark:bg-pink-900/20 dark:hover:bg-pink-900/40 dark:border-pink-800/50",
+				bug: "bg-lime-100/50 hover:bg-lime-100 border-lime-200 dark:bg-lime-900/20 dark:hover:bg-lime-900/40 dark:border-lime-800/50",
+				rock: "bg-stone-100/50 hover:bg-stone-100 border-stone-200 dark:bg-stone-900/20 dark:hover:bg-stone-900/40 dark:border-stone-800/50",
+				ghost:
+					"bg-purple-200/50 hover:bg-purple-200 border-purple-300 dark:bg-purple-950/20 dark:hover:bg-purple-950/40 dark:border-purple-800/50",
+				dragon:
+					"bg-violet-100/50 hover:bg-violet-100 border-violet-200 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 dark:border-violet-800/50",
+				dark: "bg-neutral-200/50 hover:bg-neutral-200 border-neutral-300 dark:bg-neutral-900/20 dark:hover:bg-neutral-900/40 dark:border-neutral-700",
+				steel:
+					"bg-slate-100/50 hover:bg-slate-100 border-slate-200 dark:bg-slate-800/20 dark:hover:bg-slate-800/40 dark:border-slate-700",
+				fairy:
+					"bg-pink-100/50 hover:bg-pink-100 border-pink-200 dark:bg-pink-900/20 dark:hover:bg-pink-900/40 dark:border-pink-800/50",
+				unknown:
+					"bg-gray-100/50 hover:bg-gray-100 border-gray-200 dark:bg-gray-800/30 dark:hover:bg-gray-800/60 dark:border-gray-700",
 			},
 		},
 		defaultVariants: {
-			type: "normal",
+			type: "unknown",
 		},
 	},
 );
@@ -545,53 +561,104 @@ const moveButtonVariants = cva(
  * Button component for displaying and selecting a Pokémon move
  */
 export default function BattleMoveButton({
-	moveId,
-	name,
-	type,
+	move,
 	pp,
 	maxPp,
 	disabled,
 	isDisabled,
-	disabledReason,
+	isSelected,
 	onClick,
 }: BattleMoveButtonProps) {
-	const ppPercentage = (pp / maxPp) * 100;
-	const ppColor =
-		ppPercentage === 100
-			? "text-emerald-600"
-			: ppPercentage > 50
-				? "text-emerald-600"
-				: ppPercentage > 20
-					? "text-yellow-600"
-					: "text-red-600";
+	const isButtonDisabled = disabled || isDisabled || pp <= 0;
+	const typeName = (move.type?.toLowerCase() || "unknown") as
+		| Lowercase<TypeName>
+		| "unknown";
 
 	return (
-		<Button
-			variant="ghost"
-			className={cn(
-				moveButtonVariants({ type: type.toLowerCase() as Lowercase<TypeName> }),
-				disabled && "opacity-50 cursor-not-allowed hover:bg-inherit",
-			)}
-			disabled={disabled}
-			onClick={onClick}
-		>
-			<div className="flex flex-col w-full gap-1">
-				<div className="flex items-start justify-between">
-					<span className="font-medium text-md">{name}</span>
-					<TypeBadge type={type} className="shadow-sm" />
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					variant="ghost"
+					className={cn(
+						moveButtonVariants({
+							type: typeName as Lowercase<TypeName>,
+						}),
+						isButtonDisabled &&
+							"opacity-60 cursor-not-allowed hover:bg-inherit",
+						isSelected && "ring-2 ring-primary ring-offset-2 dark:ring-offset-background",
+						"text-left",
+					)}
+					disabled={isButtonDisabled}
+					onClick={onClick}
+				>
+					<div className="flex flex-col w-full h-full gap-1">
+						<div className="flex items-center justify-center">
+							<span className="font-semibold text-base text-foreground">
+								{move.name}
+							</span>
+						</div>
+						<div className="flex items-center justify-between mt-auto">
+							<TypeBadge type={move.type} className="flex-shrink-0" />
+							<span className="font-medium">
+								{pp}/{maxPp}
+							</span>
+						</div>
+					</div>
+					{isDisabled && (
+						<div className="absolute inset-0 bg-black/5 dark:bg-white/5 flex items-center justify-center rounded-lg">
+							<span className="text-xs text-destructive font-medium bg-background/80 px-1.5 py-0.5 rounded border border-destructive/30">
+								Disabled
+							</span>
+						</div>
+					)}
+				</Button>
+			</TooltipTrigger>
+			<TooltipContent className="w-64 p-3 bg-background text-foreground shadow-sm opacity-90">
+				<div className="space-y-2">
+					<div className="flex justify-between items-center">
+						<span className="font-semibold text-base">{move.name}</span>
+						<TypeBadge type={move.type} />
+					</div>
+					<Separator />
+					<p className="text-sm text-muted-foreground leading-relaxed">
+						{move.shortDesc || move.desc || "No description available."}
+					</p>
+					<div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground pt-1">
+						<div>
+							Power:{" "}
+							<span className="font-medium text-foreground">
+								{move.basePower || "-"}
+							</span>
+						</div>
+						<div>
+							Acc:{" "}
+							<span className="font-medium text-foreground">
+								{move.accuracy === true ? "∞" : move.accuracy || "-"}
+							</span>
+						</div>
+						<div>
+							PP:{" "}
+							<span className="font-medium">
+								{pp}/{maxPp}
+							</span>
+						</div>
+					</div>
+					{move.category && (
+						<div className="text-xs text-muted-foreground">
+							Category:{" "}
+							<span className="font-medium text-foreground">
+								{move.category}
+							</span>
+						</div>
+					)}
+					{isDisabled && (
+						<p className="text-xs text-destructive font-semibold pt-1">
+							Move is currently disabled.
+						</p>
+					)}
 				</div>
-				<div className={cn("text-sm font-medium self-end", ppColor)}>
-					PP {pp}/{maxPp}
-				</div>
-			</div>
-			{isDisabled && disabledReason && (
-				<div className="absolute inset-0 bg-black/5 flex items-center justify-center">
-					<span className="text-sm text-red-700 font-medium bg-white/90 px-2 py-1 rounded-md">
-						{disabledReason}
-					</span>
-				</div>
-			)}
-		</Button>
+			</TooltipContent>
+		</Tooltip>
 	);
 }
 
@@ -602,20 +669,15 @@ app/components/BattleView.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import type { BattleState } from "../services/battle-types";
-import type { Pokemon, Battle } from "@pkmn/client";
+import type { BattleState, PlayerRequest } from "../services/battle-types";
+import type { Battle } from "@pkmn/client";
 import type { BattleEngine } from "../services/battle-engine";
-import { TYPE_COLORS } from "@/lib/constants";
-import BattleMoveButton from "./BattleMoveButton";
 import { Badge } from "./ui/badge";
-import { getStatusClass, getStatusName } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { getSprite, parseCondition, getHPColor } from "../utils/pokemonUtils";
 import { battleManager } from "@/services/battle-manager-instance";
 import { useSettings } from "@/store/settings";
-import { Card, CardContent } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
-import { TypeBadge } from "./ui/type-badge";
+import PlayerDisplay from "./PlayerDisplay";
 
 // Add this type to handle battle logs safely
 type BattleLog = {
@@ -637,18 +699,21 @@ export default function BattleView({ battleId }: BattleViewProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [retryCount, setRetryCount] = useState(0);
 	const maxRetries = 3;
+	const logScrollAreaRef = useRef<HTMLDivElement>(null);
+	const [selectedMoves, setSelectedMoves] = useState<{ p1: number | null; p2: number | null }>({
+		p1: null,
+		p2: null,
+	});
 
-	// Initialize battle engine and subscribe to updates
+	// Effect for initializing battle and subscribing to updates
 	useEffect(() => {
 		let retryTimeout: NodeJS.Timeout;
 		let mounted = true;
 
 		const initializeBattle = () => {
 			const engine = battleManager.getBattle(battleId);
-
 			if (!engine) {
 				if (retryCount < maxRetries) {
-					// Retry after a short delay
 					retryTimeout = setTimeout(() => {
 						if (mounted) {
 							setRetryCount((prev) => prev + 1);
@@ -657,57 +722,44 @@ export default function BattleView({ battleId }: BattleViewProps) {
 					}, 1000);
 					return;
 				}
-
 				setError(`Battle with ID ${battleId} not found or has ended.`);
 				setViewState(null);
 				return;
 			}
 
 			if (!mounted) return;
-
 			battleEngineRef.current = engine;
 
-			// Create a custom Battle type that extends @pkmn/client's Battle
-			const battle = engine.getBattle() as Battle & {
-				format?: string;
-				currentTurn?: number;
-				weather?: string;
-				winner?: string | null;
-				ended?: boolean;
-			};
-
+			// Initial state fetch
 			setViewState({
-				battle,
-				logs: [...engine.getLogs()], // Create a new array to avoid readonly issues
+				battle: engine.getBattle(),
+				logs: [...engine.getLogs()],
 				p1Request: engine.getP1Request(),
 				p2Request: engine.getP2Request(),
 			});
-
 			setError(null);
 			setRetryCount(0);
 
-			// Subscribe to state updates
 			const unsubscribe = engine.on("stateUpdate", (state) => {
 				if (mounted) {
 					setViewState(state);
 				}
 			});
-
-			// Handle battle end
 			const unsubscribeEnd = engine.on("battleEnd", ({ winner, state }) => {
 				if (mounted) {
 					console.log(`Battle ${battleId} ended. Winner: ${winner}`);
-					setViewState((prev) =>
-						prev
-							? {
-									...prev,
-									battle: state as Battle & { winner?: string | null },
-								}
-							: null,
-					);
+					// Ensure the final state with winner/ended status is set
+					setViewState((prev) => ({
+						...(prev ?? {
+							battle: null,
+							logs: [],
+							p1Request: null,
+							p2Request: null,
+						}),
+						battle: state,
+					}));
 				}
 			});
-
 			return () => {
 				unsubscribe();
 				unsubscribeEnd();
@@ -715,218 +767,92 @@ export default function BattleView({ battleId }: BattleViewProps) {
 		};
 
 		const cleanup = initializeBattle();
-
 		return () => {
 			mounted = false;
-			if (retryTimeout) {
-				clearTimeout(retryTimeout);
-			}
-			if (cleanup) {
-				cleanup();
-			}
+			if (retryTimeout) clearTimeout(retryTimeout);
+			if (cleanup) cleanup();
 		};
 	}, [battleId, retryCount]);
 
-	// Handle player decisions
-	const handlePlayerDecision = (player: "p1" | "p2", moveIndex: number) => {
-		if (!battleEngineRef.current) return;
-		battleEngineRef.current.processPlayerDecision(player, {
-			type: "move",
-			moveIndex,
-		});
-	};
-
-	// Render player's Pokémon information
-	const renderPokemonInfo = (player: "p1" | "p2") => {
-		if (!viewState?.battle) return <div>Loading battle state...</div>;
-
-		const pokemon = viewState.battle[player].active[0];
-		const request = player === "p1" ? viewState.p1Request : viewState.p2Request;
-		const pokemonFromRequest = request?.side.pokemon[0];
-
-		if (!pokemon) return <div>No active Pokémon</div>;
-
-		const spriteUrl = getSprite(pokemon, player, generation);
-		const itemData = pokemonFromRequest?.item
-			? battleEngineRef.current?.getItem(pokemonFromRequest.item)
-			: null;
-		const abilityData = pokemonFromRequest?.baseAbility
-			? battleEngineRef.current?.getAbility(pokemonFromRequest.baseAbility)
-			: null;
-
-		// Extract HP information
-		const { currentHP, maxHP, status } = parseCondition(pokemon);
-		const hpPercentage = maxHP > 0 ? (currentHP / maxHP) * 100 : 0;
-		const hpColor = getHPColor(hpPercentage);
-
-		return (
-			<Card className="w-full">
-				<CardContent className="pt-6">
-					<div className="flex flex-col items-center space-y-4">
-						<div className="relative">
-							<img
-								src={spriteUrl}
-								alt={pokemon.name}
-								className="w-32 h-32 object-contain pixelated"
-							/>
-							{status && (
-								<Badge
-									className={`absolute bottom-0 right-0 ${getStatusClass(status)}`}
-								>
-									{getStatusName(status)}
-								</Badge>
-							)}
-						</div>
-						<div className="text-center w-full">
-							<h3 className="text-lg font-bold mb-2">{pokemon.name}</h3>
-							<div className="flex gap-2 justify-center mb-3">
-								{pokemon.types.map((type) => (
-									<TypeBadge key={type} type={type} />
-								))}
-							</div>
-							<div className="space-y-2">
-								<div className="h-2 w-full bg-gray-200 rounded-full">
-									<div
-										className={`h-full ${hpColor} rounded-full transition-all duration-500 ease-in-out`}
-										style={{ width: `${hpPercentage}%` }}
-									/>
-								</div>
-								<p className="text-sm">
-									{currentHP} / {maxHP} HP
-								</p>
-							</div>
-							{itemData && (
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<p className="text-sm mt-2 cursor-help">
-											<span className="font-semibold">Item:</span>{" "}
-											{itemData.name}
-										</p>
-									</TooltipTrigger>
-									<TooltipContent>
-										<p className="max-w-xs">{itemData.desc}</p>
-									</TooltipContent>
-								</Tooltip>
-							)}
-							{abilityData && (
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<p className="text-sm mt-1 cursor-help">
-											<span className="font-semibold">Ability:</span>{" "}
-											{abilityData.name}
-										</p>
-									</TooltipTrigger>
-									<TooltipContent>
-										<p className="max-w-xs">{abilityData.desc}</p>
-									</TooltipContent>
-								</Tooltip>
-							)}
-						</div>
-					</div>
-				</CardContent>
-			</Card>
-		);
-	};
-
-	// Render available moves for a player
-	const renderMoves = (player: "p1" | "p2") => {
-		const request =
-			player === "p1" ? viewState?.p1Request : viewState?.p2Request;
-
-		if (!request?.active?.[0]) {
-			if (request?.wait) {
-				return (
-					<div className="text-gray-500 italic text-center p-4">
-						Waiting for opponent...
-					</div>
-				);
-			}
-			return (
-				<div className="text-gray-500 italic text-center p-4">
-					No move selection needed now.
-				</div>
+	// Effect for auto-scrolling logs
+	useEffect(() => {
+		if (logScrollAreaRef.current) {
+			const scrollElement = logScrollAreaRef.current.querySelector(
+				"[data-radix-scroll-area-viewport]",
 			);
+			if (scrollElement) {
+				scrollElement.scrollTop = scrollElement.scrollHeight;
+			}
 		}
+	}, [viewState?.logs]); // Trigger scroll on log changes
 
-		const moves = request.active[0].moves || [];
+	// Handle player decisions (forward to engine)
+	const handlePlayerDecision = (player: "p1" | "p2", moveIndex: number | null) => {
+		if (!battleEngineRef.current || viewState?.battle?.ended) return;
 
-		return (
-			<Card>
-				<CardContent className="pt-6">
-					<div className="grid grid-cols-2 gap-3">
-						{moves.map((move, index) => {
-							const moveData = battleEngineRef.current?.getMoveData(move.id);
-							if (!moveData) return null;
+		setSelectedMoves((prev) => ({
+			...prev,
+			[player]: moveIndex,
+		}));
 
-							const isDisabled = move.disabled;
-							const isButtonDisabled = !request || isDisabled || move.pp <= 0;
-
-							return (
-								<Tooltip key={move.id}>
-									<TooltipTrigger asChild>
-										<div>
-											<BattleMoveButton
-												moveId={move.id}
-												name={moveData.name}
-												type={moveData.type}
-												pp={move.pp}
-												maxPp={move.maxpp}
-												disabled={isButtonDisabled}
-												isDisabled={isDisabled}
-												disabledReason={
-													isDisabled ? "Move disabled by an effect" : undefined
-												}
-												onClick={() => {
-													if (isButtonDisabled) return;
-													handlePlayerDecision(player, index + 1);
-												}}
-											/>
-										</div>
-									</TooltipTrigger>
-									<TooltipContent>
-										<div className="space-y-1">
-											<p className="font-semibold">{moveData.name}</p>
-											<p className="text-sm">
-												{moveData.shortDesc || moveData.desc}
-											</p>
-											<div className="text-xs text-muted-foreground">
-												<span>Power: {moveData.basePower}</span>
-												<span className="mx-2">•</span>
-												<span>
-													Accuracy:{" "}
-													{moveData.accuracy === true ? "—" : moveData.accuracy}
-												</span>
-											</div>
-										</div>
-									</TooltipContent>
-								</Tooltip>
-							);
-						})}
-					</div>
-				</CardContent>
-			</Card>
-		);
+		// Only execute the turn if both players have selected their moves
+		if (moveIndex !== null && player === "p2" && selectedMoves.p1 !== null) {
+			// Execute both moves
+			battleEngineRef.current.processPlayerDecision("p1", {
+				type: "move",
+				moveIndex: selectedMoves.p1,
+			});
+			battleEngineRef.current.processPlayerDecision("p2", {
+				type: "move",
+				moveIndex: moveIndex,
+			});
+			// Reset selections
+			setSelectedMoves({ p1: null, p2: null });
+		} else if (moveIndex !== null && player === "p1" && selectedMoves.p2 !== null) {
+			// Execute both moves
+			battleEngineRef.current.processPlayerDecision("p1", {
+				type: "move",
+				moveIndex: moveIndex,
+			});
+			battleEngineRef.current.processPlayerDecision("p2", {
+				type: "move",
+				moveIndex: selectedMoves.p2,
+			});
+			// Reset selections
+			setSelectedMoves({ p1: null, p2: null });
+		}
 	};
 
 	// Render battle logs
 	const renderBattleLogs = () => {
 		if (!viewState?.logs) return null;
 
+		// Try to get turn from battle object, default to 0
+		const turn = viewState.battle?.turn ?? 0;
+
 		return (
-			<Card className="h-full">
-				<CardContent className="p-0">
-					<div className="flex items-center justify-between p-4 border-b">
-						<Badge variant="outline" className="text-base">
-							Turn {viewState.battle.turn}
-						</Badge>
-					</div>
-					<ScrollArea className="h-[400px] p-4">
+			<Card className="h-full flex flex-col">
+				<CardHeader className="py-3 px-4 border-b">
+					<CardTitle className="text-lg font-semibold">Battle Log</CardTitle>
+				</CardHeader>
+				<CardContent className="p-0 flex-grow overflow-hidden">
+					<ScrollArea
+						className="h-[calc(100vh-250px)] p-4"
+						ref={logScrollAreaRef}
+					>
+						{viewState.logs.length === 0 && (
+							<p className="text-center text-muted-foreground italic mt-4">
+								Battle starting...
+							</p>
+						)}
 						{viewState.logs.map((log, index) => {
-							const key = `${viewState.battle.turn}-${index}`;
+							// Use turn and index for a more stable key during re-renders
+							const key = `${turn}-${index}-${log.substring(0, 10)}`;
 							return (
 								<div
 									key={key}
-									className="mb-2 last:mb-0 protocol-line text-sm leading-relaxed"
+									className="mb-1 last:mb-0 protocol-line text-sm leading-normal [&_b]:font-semibold"
+									// biome-ignore lint/security/noDangerouslySetInnerHtml: Sanitized by LogFormatter
 									dangerouslySetInnerHTML={{ __html: log }}
 								/>
 							);
@@ -937,14 +863,15 @@ export default function BattleView({ battleId }: BattleViewProps) {
 		);
 	};
 
+	// Error and Loading States
 	if (error) {
 		return (
-			<Card className="mx-auto max-w-md">
+			<Card className="mx-auto max-w-md mt-10">
 				<CardContent className="p-6">
-					<div className="text-red-500 text-center">
+					<div className="text-destructive text-center font-medium">
 						{error}
 						{retryCount < maxRetries && (
-							<div className="mt-2 text-sm">
+							<div className="mt-2 text-sm text-muted-foreground">
 								Attempting to reconnect... (Attempt {retryCount + 1}/
 								{maxRetries})
 							</div>
@@ -957,34 +884,37 @@ export default function BattleView({ battleId }: BattleViewProps) {
 
 	if (!viewState?.battle) {
 		return (
-			<Card className="mx-auto max-w-md">
+			<Card className="mx-auto max-w-xs mt-10">
 				<CardContent className="p-6">
-					<div className="text-center">Loading battle state...</div>
+					<div className="text-center text-muted-foreground animate-pulse">
+						Loading Battle...
+					</div>
 				</CardContent>
 			</Card>
 		);
 	}
 
+	// Get the battle object with extended type assertion for winner/ended
 	const battle = viewState.battle as Battle & {
-		format?: string;
-		currentTurn?: number;
-		weather?: string;
 		winner?: string | null;
 		ended?: boolean;
 	};
 
 	return (
-		<div className="flex flex-col w-full max-w-7xl mx-auto space-y-6">
-			{/* Battle Header */}
-			{(battle.winner || battle.ended) && (
-				<Card className="bg-primary/5 border-primary/20">
-					<CardContent className="flex items-center justify-center p-4">
+		<div className="flex flex-col w-full max-w-7xl mx-auto space-y-4">
+			{/* Battle End State Banner */}
+			{(battle.winner || battle.ended) && !battle.winner && (
+				<Card className="bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30">
+					<CardContent className="flex items-center justify-center p-3">
 						{battle.winner ? (
-							<Badge variant="default" className="text-lg px-6 py-2">
+							<Badge
+								variant="default"
+								className="text-base px-4 py-1 bg-green-600 hover:bg-green-700 text-white"
+							>
 								Winner: {battle.winner}
 							</Badge>
 						) : (
-							<Badge variant="secondary" className="text-lg px-6 py-2">
+							<Badge variant="secondary" className="text-base px-4 py-1">
 								Result: Tie
 							</Badge>
 						)}
@@ -993,20 +923,34 @@ export default function BattleView({ battleId }: BattleViewProps) {
 			)}
 
 			{/* Main Battle Grid */}
-			<div className="grid grid-cols-3 gap-6">
+			<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
 				{/* Player 1 */}
-				<div className="col-span-1 space-y-4">
-					{renderPokemonInfo("p1")}
-					{renderMoves("p1")}
+				<div className="col-span-1">
+					<PlayerDisplay
+						player="p1"
+						battle={battle}
+						request={viewState.p1Request}
+						generation={generation}
+						engine={battleEngineRef.current}
+						selectedMove={selectedMoves.p1}
+						onMoveSelect={handlePlayerDecision}
+					/>
 				</div>
 
 				{/* Battle Log */}
-				<div className="col-span-1">{renderBattleLogs()}</div>
+				<div className="col-span-1 h-full">{renderBattleLogs()}</div>
 
 				{/* Player 2 */}
-				<div className="col-span-1 space-y-4">
-					{renderPokemonInfo("p2")}
-					{renderMoves("p2")}
+				<div className="col-span-1">
+					<PlayerDisplay
+						player="p2"
+						battle={battle}
+						request={viewState.p2Request}
+						generation={generation}
+						engine={battleEngineRef.current}
+						selectedMove={selectedMoves.p2}
+						onMoveSelect={handlePlayerDecision}
+					/>
 				</div>
 			</div>
 		</div>
@@ -1015,38 +959,224 @@ export default function BattleView({ battleId }: BattleViewProps) {
 
 
 ---
-app/lib/constants.ts
+app/components/PlayerDisplay.tsx
 ---
+import React from "react";
+import type { Pokemon, Battle } from "@pkmn/client";
+import type { PlayerRequest, MoveData } from "@/services/battle-types";
+import type { BattleEngine } from "@/services/battle-engine";
 import type { GenerationNum } from "@pkmn/types";
+import { Card, CardContent } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { TypeBadge } from "./ui/type-badge";
+import BattleMoveButton from "./BattleMoveButton";
+import { getSprite, parseCondition, getHPColor } from "@/utils/pokemonUtils";
+import { getStatusClass, getStatusName } from "@/lib/utils";
+import { Button } from "./ui/button";
 
-export const TYPE_COLORS = {
-	normal: "bg-gray-400 hover:bg-gray-500 text-white",
-	fire: "bg-red-500 hover:bg-red-600 text-white",
-	water: "bg-blue-500 hover:bg-blue-600 text-white",
-	electric: "bg-yellow-400 hover:bg-yellow-500 text-black",
-	grass: "bg-emerald-500 hover:bg-emerald-600 text-white",
-	ice: "bg-cyan-400 hover:bg-cyan-500 text-black",
-	fighting: "bg-red-700 hover:bg-red-800 text-white",
-	poison: "bg-purple-500 hover:bg-purple-600 text-white",
-	ground: "bg-amber-700 hover:bg-amber-800 text-white",
-	flying: "bg-sky-400 hover:bg-sky-500 text-white",
-	psychic: "bg-pink-500 hover:bg-pink-600 text-white",
-	bug: "bg-lime-500 hover:bg-lime-600 text-white",
-	rock: "bg-stone-600 hover:bg-stone-700 text-white",
-	ghost: "bg-purple-700 hover:bg-purple-800 text-white",
-	dragon: "bg-violet-600 hover:bg-violet-700 text-white",
-	dark: "bg-neutral-800 hover:bg-neutral-900 text-white",
-	steel: "bg-slate-500 hover:bg-slate-600 text-white",
-	fairy: "bg-pink-300 hover:bg-pink-400 text-black",
-} as const;
+interface PlayerDisplayProps {
+	player: "p1" | "p2";
+	battle: Battle | null;
+	request: PlayerRequest | null;
+	generation: GenerationNum;
+	engine: BattleEngine | null;
+	selectedMove: number | null;
+	onMoveSelect: (player: "p1" | "p2", moveIndex: number | null) => void;
+}
 
-export const getFormat = (generation: GenerationNum): string => {
-	return `gen${generation}randombattle`;
-};
+export default function PlayerDisplay({
+	player,
+	battle,
+	request,
+	generation,
+	engine,
+	selectedMove,
+	onMoveSelect,
+}: PlayerDisplayProps) {
+	if (!battle || !engine) {
+		return (
+			<Card className="w-full">
+				<CardContent className="pt-6 text-center text-muted-foreground">
+					Loading player...
+				</CardContent>
+			</Card>
+		);
+	}
 
-export const getGraphics = (generation: GenerationNum): string => {
-	return generation <= 4 ? `gen${generation}` : "gen5ani";
-};
+	const pokemon = battle[player].active[0];
+	// Get request data even if pokemon exists, for item/ability/moves
+	const pokemonFromRequest = request?.side.pokemon.find((p) => p.active);
+
+	const renderInfo = () => {
+		if (!pokemon) {
+			return (
+				<div className="text-center text-muted-foreground italic h-32 flex items-center justify-center">
+					No active Pokémon
+				</div>
+			);
+		}
+
+		const spriteUrl = getSprite(pokemon, player, generation);
+		// Use request for item/ability as it's more reliable during updates
+		const itemData = pokemonFromRequest?.item
+			? engine.getItem(pokemonFromRequest.item)
+			: null;
+		const abilityData = pokemonFromRequest?.baseAbility
+			? engine.getAbility(pokemonFromRequest.baseAbility)
+			: null;
+
+		const { currentHP, maxHP, status } = parseCondition(pokemon);
+		const hpPercentage = maxHP > 0 ? (currentHP / maxHP) * 100 : 0;
+		const hpColor = getHPColor(hpPercentage);
+
+		return (
+			<div className="flex flex-col items-center space-y-3">
+				<div className="relative w-32 h-32">
+					<img
+						src={spriteUrl}
+						alt={pokemon.name}
+						className="w-full h-full object-contain pixelated"
+					/>
+					{status && (
+						<Badge
+							variant="secondary"
+							className={`absolute bottom-0 right-0 text-xs px-1.5 py-0.5 ${getStatusClass(status)}`}
+						>
+							{getStatusName(status)}
+						</Badge>
+					)}
+				</div>
+				<div className="text-center w-full">
+					<h3 className="text-lg font-bold mb-1">{pokemon.name}</h3>
+					<div className="flex gap-1.5 justify-center mb-2">
+						{pokemon.types.map((type) => (
+							<TypeBadge key={type} type={type} />
+						))}
+					</div>
+					<div className="space-y-1">
+						<div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+							<div
+								className={`h-full ${hpColor} rounded-full transition-all duration-300 ease-in-out`}
+								style={{ width: `${hpPercentage}%` }}
+							/>
+						</div>
+						<p className="text-xs font-medium text-muted-foreground">
+							{currentHP} / {maxHP} HP
+						</p>
+					</div>
+					{itemData && (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<p className="text-xs mt-1.5 cursor-help text-muted-foreground">
+									Item: <span className="font-medium">{itemData.name}</span>
+								</p>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p className="max-w-xs text-sm">
+									{itemData.desc || "No description."}
+								</p>
+							</TooltipContent>
+						</Tooltip>
+					)}
+					{abilityData && (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<p className="text-xs mt-0.5 cursor-help text-muted-foreground">
+									Ability:{" "}
+									<span className="font-medium">{abilityData.name}</span>
+								</p>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p className="max-w-xs text-sm">
+									{abilityData.desc || "No description."}
+								</p>
+							</TooltipContent>
+						</Tooltip>
+					)}
+				</div>
+			</div>
+		);
+	};
+
+	const renderMovesSection = () => {
+		// Show waiting message if explicitly waiting for opponent
+		if (request?.wait) {
+			return (
+				<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
+					Waiting for opponent...
+				</div>
+			);
+		}
+
+		const moves = request?.active?.[0]?.moves;
+		if (!moves || moves.length === 0) {
+			return (
+				<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
+					No moves available (e.g., Struggle).
+				</div>
+			);
+		}
+
+		return (
+			<div className="space-y-3">
+				<div className="grid grid-cols-2 gap-2.5">
+					{moves.map((moveInfo, index) => {
+						const moveData = engine.getMoveData(moveInfo.id);
+						if (!moveData) return null;
+
+						const isDisabled = moveInfo.disabled;
+						const isButtonDisabled = isDisabled || moveInfo.pp <= 0;
+
+						return (
+							<BattleMoveButton
+								key={`${moveInfo.id}-${index}`}
+								move={moveData}
+								pp={moveInfo.pp}
+								maxPp={moveInfo.maxpp}
+								disabled={isButtonDisabled}
+								isDisabled={isDisabled}
+								isSelected={selectedMove === index + 1}
+								onClick={() => {
+									if (isButtonDisabled) return;
+									// If this move is already selected, deselect it
+									if (selectedMove === index + 1) {
+										onMoveSelect(player, null);
+									} else {
+										onMoveSelect(player, index + 1);
+									}
+								}}
+							/>
+						);
+					})}
+				</div>
+				{selectedMove !== null && (
+					<div className="flex justify-end">
+						<Button
+							variant="ghost"
+							size="sm"
+							className="text-destructive hover:text-destructive/90"
+							onClick={() => onMoveSelect(player, null)}
+						>
+							Cancel Selection
+						</Button>
+					</div>
+				)}
+			</div>
+		);
+	};
+
+	return (
+		<div className="flex flex-col space-y-4 w-full">
+			<Card>
+				<CardContent className="pt-5 pb-4">{renderInfo()}</CardContent>
+			</Card>
+			<Card>
+				<CardContent className="pt-4 pb-4">{renderMovesSection()}</CardContent>
+			</Card>
+		</div>
+	);
+}
 
 
 ---
@@ -1846,43 +1976,44 @@ import type { GraphicsGen } from "@pkmn/img";
 import { PRNG } from "@pkmn/sim";
 import type { GenerationNum, TypeName } from "@pkmn/types";
 
-const SPRITES: { [gen in GenerationNum]: GraphicsGen[] } = {
-    1: ['gen1rg', 'gen1rb', 'gen1'],
-    2: ['gen2g', 'gen2s', 'gen2'],
-    3: ['gen3rs', 'gen3frlg', 'gen3', 'gen3-2'],
-    4: ['gen4dp', 'gen4dp-2', 'gen4'],
-    5: ['gen5', 'gen5ani'],
-    6: ['ani'],
-    7: ['ani'],
-    8: ['ani'],
-    9: ['ani'],
+const SPRITES: { [gen in GenerationNum]: GraphicsGen } = {
+	1: "gen1rg",
+	2: "gen2g",
+	3: "gen3rs",
+	4: "gen4dp",
+	5: "gen5",
+	6: "ani",
+	7: "ani",
+	8: "ani",
+	9: "ani",
 };
 
-const prng = new PRNG();
-export const getFormat = (generation: GenerationNum) => `gen${generation}randombattle`;
-export const getGraphics = (generation: GenerationNum) => prng.sample(SPRITES[generation]);
+export const getFormat = (generation: GenerationNum) =>
+	`gen${generation}randombattle`;
+export const getGraphics = (generation: GenerationNum) => SPRITES[generation];
 
 // Type color mapping
 export const TYPE_COLORS: Partial<Record<TypeName, string>> = {
-    Normal: "bg-gray-400",
-    Fire: "bg-red-500",
-    Water: "bg-blue-500",
-    Electric: "bg-yellow-400",
-    Grass: "bg-green-500",
-    Ice: "bg-blue-200",
-    Fighting: "bg-red-700",
-    Poison: "bg-purple-500",
-    Ground: "bg-yellow-600",
-    Flying: "bg-indigo-400",
-    Psychic: "bg-pink-500",
-    Bug: "bg-lime-500",
-    Rock: "bg-yellow-800",
-    Ghost: "bg-purple-700",
-    Dragon: "bg-indigo-600",
-    Dark: "bg-gray-800",
-    Steel: "bg-gray-500",
-    Fairy: "bg-pink-300",
+	Normal: "bg-gray-400",
+	Fire: "bg-red-500",
+	Water: "bg-blue-500",
+	Electric: "bg-yellow-400",
+	Grass: "bg-green-500",
+	Ice: "bg-blue-200",
+	Fighting: "bg-red-700",
+	Poison: "bg-purple-500",
+	Ground: "bg-yellow-600",
+	Flying: "bg-indigo-400",
+	Psychic: "bg-pink-500",
+	Bug: "bg-lime-500",
+	Rock: "bg-yellow-800",
+	Ghost: "bg-purple-700",
+	Dragon: "bg-indigo-600",
+	Dark: "bg-gray-800",
+	Steel: "bg-gray-500",
+	Fairy: "bg-pink-300",
 };
+
 
 ---
 lib/utils.ts

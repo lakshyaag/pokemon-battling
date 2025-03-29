@@ -10,6 +10,7 @@ export interface BattleEventMap {
     battleEnd: { winner: string | null; state: Battle };
     playerRequest: { player: "p1" | "p2"; request: PlayerRequest };
     playerMove: { player: "p1" | "p2"; moveIndex: number };
+    playerSwitch: { player: "p1" | "p2"; pokemonIndex: number };
 }
 
 /**

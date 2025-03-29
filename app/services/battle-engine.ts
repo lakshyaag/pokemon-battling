@@ -208,31 +208,44 @@ export class BattleEngine {
 	}
 
 	/**
-	 * Process a player's move decision
+	 * Process a player's decision (move or switch)
 	 * @param player - The player ID
 	 * @param decision - The player's decision
 	 */
 	processPlayerDecision(player: "p1" | "p2", decision: PlayerDecision): void {
-		// Clear the request as the player has made a choice
-		if (player === 'p1') this.p1Request = null;
-		else this.p2Request = null;
+		const playerStream = player === "p1" ? this.p1Stream : this.p2Stream;
+		let choice = "";
 
 		if (decision.type === "move") {
-			const choice = `move ${decision.moveIndex}`;
-			if (player === "p1") {
-				void this.p1Stream.write(choice);
-			} else {
-				void this.p2Stream.write(choice);
-			}
+			choice = `move ${decision.moveIndex}`;
 			this.eventEmitter.emit("playerMove", { player, moveIndex: decision.moveIndex });
+		} else if (decision.type === "switch") {
+			choice = `switch ${decision.pokemonIndex}`;
+			this.eventEmitter.emit("playerSwitch", { player, pokemonIndex: decision.pokemonIndex });
 		}
 
-		this.eventEmitter.emit("stateUpdate", {
-			battle: this.battle,
-			logs: [...this.logs],
-			p1Request: this.p1Request,
-			p2Request: this.p2Request
-		});
+		if (choice) {
+			// Clear the corresponding request as the player has made a choice
+			if (player === 'p1') this.p1Request = null;
+			else this.p2Request = null;
+
+			// Write the choice to the player's stream
+			try {
+				void playerStream.write(choice);
+			} catch (error) {
+				console.error(`Error writing choice for ${player}:`, error);
+			}
+
+			// Emit state update
+			this.eventEmitter.emit("stateUpdate", {
+				battle: this.battle,
+				logs: [...this.logs],
+				p1Request: this.p1Request,
+				p2Request: this.p2Request
+			});
+		} else {
+			console.warn(`Invalid decision type received for ${player}:`, decision);
+		}
 	}
 
 	/**
