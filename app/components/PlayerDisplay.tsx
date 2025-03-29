@@ -1,6 +1,6 @@
 import React from "react";
 import type { Pokemon, Battle } from "@pkmn/client";
-import type { PlayerRequest } from "@/services/battle-types";
+import type { PlayerRequest, MoveData } from "@/services/battle-types";
 import type { BattleEngine } from "@/services/battle-engine";
 import type { GenerationNum } from "@pkmn/types";
 import { Card, CardContent } from "./ui/card";
@@ -10,6 +10,7 @@ import { TypeBadge } from "./ui/type-badge";
 import BattleMoveButton from "./BattleMoveButton";
 import { getSprite, parseCondition, getHPColor } from "@/utils/pokemonUtils";
 import { getStatusClass, getStatusName } from "@/lib/utils";
+import { Button } from "./ui/button";
 
 interface PlayerDisplayProps {
 	player: "p1" | "p2";
@@ -17,7 +18,8 @@ interface PlayerDisplayProps {
 	request: PlayerRequest | null;
 	generation: GenerationNum;
 	engine: BattleEngine | null;
-	onMoveSelect: (player: "p1" | "p2", moveIndex: number) => void;
+	selectedMove: number | null;
+	onMoveSelect: (player: "p1" | "p2", moveIndex: number | null) => void;
 }
 
 export default function PlayerDisplay({
@@ -26,6 +28,7 @@ export default function PlayerDisplay({
 	request,
 	generation,
 	engine,
+	selectedMove,
 	onMoveSelect,
 }: PlayerDisplayProps) {
 	if (!battle || !engine) {
@@ -134,20 +137,17 @@ export default function PlayerDisplay({
 	};
 
 	const renderMovesSection = () => {
-		// Check if a request exists and is active (not waiting)
-		if (!request || request.wait || !request.active?.[0]) {
-			const message = request?.wait
-				? "Waiting for opponent..."
-				: "No action required.";
+		// Show waiting message if explicitly waiting for opponent
+		if (request?.wait) {
 			return (
 				<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
-					{message}
+					Waiting for opponent...
 				</div>
 			);
 		}
 
-		const moves = request.active[0].moves || [];
-		if (moves.length === 0) {
+		const moves = request?.active?.[0]?.moves;
+		if (!moves || moves.length === 0) {
 			return (
 				<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
 					No moves available (e.g., Struggle).
@@ -156,31 +156,49 @@ export default function PlayerDisplay({
 		}
 
 		return (
-			<div className="grid grid-cols-2 gap-2.5">
-				{moves.map((moveInfo, index) => {
-					const moveData = engine.getMoveData(moveInfo.id);
-					if (!moveData) return null; // Should not happen ideally
+			<div className="space-y-3">
+				<div className="grid grid-cols-2 gap-2.5">
+					{moves.map((moveInfo, index) => {
+						const moveData = engine.getMoveData(moveInfo.id);
+						if (!moveData) return null;
 
-					const isDisabled = moveInfo.disabled;
-					// Button is disabled if the request doesn't exist (already chose),
-					// or the specific move is disabled, or PP is 0.
-					const isButtonDisabled = !request || isDisabled || moveInfo.pp <= 0;
+						const isDisabled = moveInfo.disabled;
+						const isButtonDisabled = isDisabled || moveInfo.pp <= 0;
 
-					return (
-						<BattleMoveButton
-							key={`${moveInfo.id}-${index}`}
-							move={moveData}
-							pp={moveInfo.pp}
-							maxPp={moveInfo.maxpp}
-							disabled={isButtonDisabled}
-							isDisabled={isDisabled}
-							onClick={() => {
-								if (isButtonDisabled) return;
-								onMoveSelect(player, index + 1); // Use 1-based index for protocol
-							}}
-						/>
-					);
-				})}
+						return (
+							<BattleMoveButton
+								key={`${moveInfo.id}-${index}`}
+								move={moveData}
+								pp={moveInfo.pp}
+								maxPp={moveInfo.maxpp}
+								disabled={isButtonDisabled}
+								isDisabled={isDisabled}
+								isSelected={selectedMove === index + 1}
+								onClick={() => {
+									if (isButtonDisabled) return;
+									// If this move is already selected, deselect it
+									if (selectedMove === index + 1) {
+										onMoveSelect(player, null);
+									} else {
+										onMoveSelect(player, index + 1);
+									}
+								}}
+							/>
+						);
+					})}
+				</div>
+				{selectedMove !== null && (
+					<div className="flex justify-end">
+						<Button
+							variant="ghost"
+							size="sm"
+							className="text-destructive hover:text-destructive/90"
+							onClick={() => onMoveSelect(player, null)}
+						>
+							Cancel Selection
+						</Button>
+					</div>
+				)}
 			</div>
 		);
 	};

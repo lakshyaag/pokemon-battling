@@ -14,6 +14,7 @@ interface BattleMoveButtonProps {
 	maxPp: number;
 	disabled?: boolean;
 	isDisabled?: boolean;
+	isSelected?: boolean;
 	onClick: () => void;
 }
 
@@ -73,19 +74,9 @@ export default function BattleMoveButton({
 	maxPp,
 	disabled,
 	isDisabled,
+	isSelected,
 	onClick,
 }: BattleMoveButtonProps) {
-	const ppPercentage = maxPp > 0 ? (pp / maxPp) * 100 : 0;
-	let ppColor = "text-emerald-600 dark:text-emerald-400"; // Default: Green (good PP)
-	if (ppPercentage <= 50 && ppPercentage > 25) {
-		ppColor = "text-yellow-600 dark:text-yellow-400"; // Yellow (medium PP)
-	} else if (ppPercentage <= 25) {
-		ppColor = "text-red-600 dark:text-red-400"; // Red (low PP)
-	}
-	if (pp <= 0) {
-		ppColor = "text-gray-500 dark:text-gray-500"; // Gray (no PP)
-	}
-
 	const isButtonDisabled = disabled || isDisabled || pp <= 0;
 	const typeName = (move.type?.toLowerCase() || "unknown") as
 		| Lowercase<TypeName>
@@ -102,6 +93,7 @@ export default function BattleMoveButton({
 						}),
 						isButtonDisabled &&
 							"opacity-60 cursor-not-allowed hover:bg-inherit",
+						isSelected && "ring-2 ring-primary ring-offset-2 dark:ring-offset-background",
 						"text-left",
 					)}
 					disabled={isButtonDisabled}
@@ -115,7 +107,7 @@ export default function BattleMoveButton({
 						</div>
 						<div className="flex items-center justify-between mt-auto">
 							<TypeBadge type={move.type} className="flex-shrink-0" />
-							<span className={cn("text-xs font-medium", ppColor)}>
+							<span className="font-medium">
 								{pp}/{maxPp}
 							</span>
 						</div>
@@ -154,7 +146,7 @@ export default function BattleMoveButton({
 						</div>
 						<div>
 							PP:{" "}
-							<span className={cn("font-medium", ppColor)}>
+							<span className="font-medium">
 								{pp}/{maxPp}
 							</span>
 						</div>

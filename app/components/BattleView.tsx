@@ -32,6 +32,10 @@ export default function BattleView({ battleId }: BattleViewProps) {
 	const [retryCount, setRetryCount] = useState(0);
 	const maxRetries = 3;
 	const logScrollAreaRef = useRef<HTMLDivElement>(null);
+	const [selectedMoves, setSelectedMoves] = useState<{ p1: number | null; p2: number | null }>({
+		p1: null,
+		p2: null,
+	});
 
 	// Effect for initializing battle and subscribing to updates
 	useEffect(() => {
@@ -115,12 +119,40 @@ export default function BattleView({ battleId }: BattleViewProps) {
 	}, [viewState?.logs]); // Trigger scroll on log changes
 
 	// Handle player decisions (forward to engine)
-	const handlePlayerDecision = (player: "p1" | "p2", moveIndex: number) => {
-		if (!battleEngineRef.current || viewState?.battle?.ended) return; // Prevent moves after battle ends
-		battleEngineRef.current.processPlayerDecision(player, {
-			type: "move",
-			moveIndex,
-		});
+	const handlePlayerDecision = (player: "p1" | "p2", moveIndex: number | null) => {
+		if (!battleEngineRef.current || viewState?.battle?.ended) return;
+
+		setSelectedMoves((prev) => ({
+			...prev,
+			[player]: moveIndex,
+		}));
+
+		// Only execute the turn if both players have selected their moves
+		if (moveIndex !== null && player === "p2" && selectedMoves.p1 !== null) {
+			// Execute both moves
+			battleEngineRef.current.processPlayerDecision("p1", {
+				type: "move",
+				moveIndex: selectedMoves.p1,
+			});
+			battleEngineRef.current.processPlayerDecision("p2", {
+				type: "move",
+				moveIndex: moveIndex,
+			});
+			// Reset selections
+			setSelectedMoves({ p1: null, p2: null });
+		} else if (moveIndex !== null && player === "p1" && selectedMoves.p2 !== null) {
+			// Execute both moves
+			battleEngineRef.current.processPlayerDecision("p1", {
+				type: "move",
+				moveIndex: moveIndex,
+			});
+			battleEngineRef.current.processPlayerDecision("p2", {
+				type: "move",
+				moveIndex: selectedMoves.p2,
+			});
+			// Reset selections
+			setSelectedMoves({ p1: null, p2: null });
+		}
 	};
 
 	// Render battle logs
@@ -232,6 +264,7 @@ export default function BattleView({ battleId }: BattleViewProps) {
 						request={viewState.p1Request}
 						generation={generation}
 						engine={battleEngineRef.current}
+						selectedMove={selectedMoves.p1}
 						onMoveSelect={handlePlayerDecision}
 					/>
 				</div>
@@ -247,6 +280,7 @@ export default function BattleView({ battleId }: BattleViewProps) {
 						request={viewState.p2Request}
 						generation={generation}
 						engine={battleEngineRef.current}
+						selectedMove={selectedMoves.p2}
 						onMoveSelect={handlePlayerDecision}
 					/>
 				</div>
