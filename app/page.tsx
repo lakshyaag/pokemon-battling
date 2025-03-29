@@ -19,8 +19,7 @@ export default function Home() {
 						Pokemon Battling
 					</h1>
 					<p className="text-xl text-muted-foreground max-w-2xl">
-						Experience thrilling Pokemon battles! Choose your Pokemon and moves,
-						or jump straight into a random battle for quick action.
+						Experience thrilling Pokemon battles!
 					</p>
 				</div>
 
@@ -34,8 +33,8 @@ export default function Home() {
 						</CardHeader>
 						<CardContent>
 							<p className="text-muted-foreground">
-								Jump straight into action with randomly selected Pokemon and
-								moves for both you and your opponent.
+								Jump straight into action with randomly selected Pokemon, and
+								see how they battle it out!
 							</p>
 						</CardContent>
 						<CardFooter className="mt-auto">
