@@ -100,42 +100,41 @@ export async function getRandomMovesForPokemon(
 export function getSprite(
 	pokemon: Pokemon,
 	player: "p1" | "p2",
-	generation: number = 3,
+	generation: GenerationNum,
 ): string {
-	// Get species name in the format expected by @pkmn/img
 	const species = pokemon.speciesForme.toLowerCase();
+	const graphics = getGraphics(generation);
 
-	// Get sprite options
 	const options = {
-		gen: generation,
+		gen: graphics,
 		shiny: pokemon.shiny,
 		gender: pokemon.gender,
 		side: player,
-		mod: "ani", // Use animated sprites
 	};
 
-	// Get sprite URL using static method
 	return Sprites.getPokemon(species, options).url;
 }
 
 /**
- * Parse HP and status from condition string
+ * Parse a Pokémon's HP and status information
  */
-export function parseCondition(pokemon?: Pokemon | null) {
-	if (!pokemon) return { currentHP: 0, maxHP: 0, status: "" };
-
-	const currentHP = pokemon.hp;
-	const maxHP = pokemon.maxhp;
-	const status = pokemon.status;
-
-	return { currentHP, maxHP, status };
+export function parseCondition(pokemon: Pokemon) {
+	return {
+		currentHP: pokemon.hp || 0,
+		maxHP: pokemon.maxhp || 0,
+		status: pokemon.status || null,
+	};
 }
 
 /**
- * Get HP bar color based on percentage
+ * Get the appropriate Tailwind CSS color class for an HP percentage
  */
-export function getHPColor(percentage: number): string {
-	if (percentage > 50) return "bg-green-500";
-	if (percentage > 20) return "bg-yellow-500";
+export function getHPColor(hpPercentage: number): string {
+	if (hpPercentage > 50) {
+		return "bg-emerald-500";
+	}
+	if (hpPercentage > 20) {
+		return "bg-yellow-500";
+	}
 	return "bg-red-500";
 }
