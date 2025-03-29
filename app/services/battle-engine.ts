@@ -41,7 +41,6 @@ export class BattleEngine {
 	private dex: ModdedDex;
 	private gens: Generations;
 	private format: string;
-	private battleState: BattleState;
 	private eventEmitter: BattleEventEmitter;
 	private p1: ManualPlayer;
 	private p2: ManualPlayer;
@@ -63,31 +62,6 @@ export class BattleEngine {
 
 		// Set up team generators
 		DTeams.setGeneratorFactory(TeamGenerators);
-
-		// Initialize battle state
-		this.battleState = {
-			format: this.format,
-			turn: 0,
-			p1: {
-				name: options.p1Name,
-				active: null,
-				team: [],
-				request: null,
-				selectedMove: null,
-			},
-			p2: {
-				name: options.p2Name,
-				active: null,
-				team: [],
-				request: null,
-				selectedMove: null,
-			},
-			weather: "none",
-			status: "Initializing battle...",
-			logs: [],
-			isComplete: false,
-			winner: null,
-		};
 
 		// Create battle streams
 		this.streams = BattleStreams.getPlayerStreams(
@@ -121,7 +95,7 @@ export class BattleEngine {
 		if (options.onBattleUpdate) {
 			this.on("stateUpdate", (state) => {
 				if (options.onBattleUpdate) {
-					options.onBattleUpdate(this.getState());
+					options.onBattleUpdate(state);
 				}
 			});
 		}
@@ -216,11 +190,11 @@ export class BattleEngine {
 		const p2TeamFinal = p2Team || createTeam();
 
 		const p1spec = {
-			name: this.p1.name,
+			name: this.p1.playerName,
 			team: p1TeamFinal ? DTeams.import(p1TeamFinal) : null,
 		};
 		const p2spec = {
-			name: this.p2.name,
+			name: this.p2.playerName,
 			team: p2TeamFinal ? DTeams.import(p2TeamFinal) : null,
 		};
 
@@ -286,14 +260,6 @@ export class BattleEngine {
 	 */
 	getAbility(abilityId: string) {
 		return this.dex.abilities.get(abilityId);
-	}
-
-	/**
-	 * Get the current battle state (immutable)
-	 * @returns A copy of the battle state
-	 */
-	getState(): Readonly<BattleState> {
-		return { ...this.battleState };
 	}
 
 	/**

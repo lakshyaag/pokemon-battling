@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import BattleView from "@/components/BattleView";
-import { useBattleStore } from "@/store/battle-store";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { battleManager } from "@/services/battle-manager-instance";
@@ -10,7 +9,6 @@ import { useSettings } from "@/store/settings";
 import { getFormat } from "@/lib/constants";
 
 export default function BattlePage() {
-	const { p1Team, p2Team, reset: resetBattleStore } = useBattleStore();
 	const { generation } = useSettings();
 	const router = useRouter();
 	const [battleId, setBattleId] = useState<string | null>(null);
@@ -28,8 +26,6 @@ export default function BattlePage() {
 					format,
 					p1Name,
 					p2Name,
-					p1Team: p1Team || undefined,
-					p2Team: p2Team || undefined,
 				});
 
 				// Subscribe to battle end to handle cleanup
@@ -52,19 +48,17 @@ export default function BattlePage() {
 		return () => {
 			if (battleId) {
 				const battle = battleManager.getBattle(battleId);
-				if (battle && !battle.getState().isComplete) {
+				if (battle) {
 					battleManager.removeBattle(battleId);
 				}
 			}
-			resetBattleStore();
 		};
-	}, [generation, p1Team, p2Team, router, resetBattleStore, battleId]);
+	}, [generation, router, battleId]);
 
 	const handleReturnHome = () => {
 		if (battleId) {
 			battleManager.removeBattle(battleId);
 		}
-		resetBattleStore();
 		router.push("/");
 	};
 

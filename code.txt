@@ -6,6 +6,11 @@ app/globals.css
 
 @custom-variant dark (&:is(.dark *));
 
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -186,7 +191,6 @@ import {
 	CardFooter,
 } from "@/components/ui/card";
 import { ArrowRight, Swords, Dices } from "lucide-react";
-import { GenerationSelector } from "@/components/GenerationSelector";
 
 export default function Home() {
 	return (
@@ -200,13 +204,9 @@ export default function Home() {
 						Experience thrilling Pokemon battles! Choose your Pokemon and moves,
 						or jump straight into a random battle for quick action.
 					</p>
-					<div className="flex items-center gap-4">
-						<p className="text-muted-foreground">Select Pokemon Generation:</p>
-						<GenerationSelector />
-					</div>
 				</div>
 
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+				<div className="grid grid-cols-1 gap-6 max-w-4xl mx-auto">
 					<Card className="flex flex-col">
 						<CardHeader>
 							<div className="flex items-center gap-2">
@@ -231,49 +231,7 @@ export default function Home() {
 							</Button>
 						</CardFooter>
 					</Card>
-
-					<Card className="flex flex-col">
-						<CardHeader>
-							<div className="flex items-center gap-2">
-								<Swords className="w-6 h-6" />
-								<h2 className="text-2xl font-semibold">Choose & Battle</h2>
-							</div>
-						</CardHeader>
-						<CardContent>
-							<p className="text-muted-foreground">
-								Select your favorite Pokemon from the Pokedex, get assigned
-								random moves, and battle against a computer opponent.
-							</p>
-						</CardContent>
-						<CardFooter className="mt-auto">
-							<Button className="w-full" size="lg" variant="outline" asChild>
-								<Link
-									href="/pkmn-select"
-									className="flex items-center justify-center gap-2"
-								>
-									Start Battle <ArrowRight className="w-4 h-4" />
-								</Link>
-							</Button>
-						</CardFooter>
-					</Card>
 				</div>
-
-				<Card className="mt-12 max-w-4xl mx-auto">
-					<CardHeader>
-						<h2 className="text-2xl font-semibold">How It Works</h2>
-					</CardHeader>
-					<CardContent>
-						<ol className="list-decimal pl-5 space-y-3 text-lg">
-							<li>
-								Select your Pokemon from the Pokedex (or get a random one)
-							</li>
-							<li>Get assigned 4 random moves from that Pokemon's learnset</li>
-							<li>
-								<b>FIGHT!</b>
-							</li>
-						</ol>
-					</CardContent>
-				</Card>
 			</div>
 
 			<footer className="fixed bottom-0 w-full border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -301,7 +259,6 @@ app/battle/page.tsx
 
 import React, { useState, useEffect } from "react";
 import BattleView from "@/components/BattleView";
-import { useBattleStore } from "@/store/battle-store";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { battleManager } from "@/services/battle-manager-instance";
@@ -309,7 +266,6 @@ import { useSettings } from "@/store/settings";
 import { getFormat } from "@/lib/constants";
 
 export default function BattlePage() {
-	const { p1Team, p2Team, reset: resetBattleStore } = useBattleStore();
 	const { generation } = useSettings();
 	const router = useRouter();
 	const [battleId, setBattleId] = useState<string | null>(null);
@@ -327,8 +283,6 @@ export default function BattlePage() {
 					format,
 					p1Name,
 					p2Name,
-					p1Team: p1Team || undefined,
-					p2Team: p2Team || undefined,
 				});
 
 				// Subscribe to battle end to handle cleanup
@@ -351,19 +305,17 @@ export default function BattlePage() {
 		return () => {
 			if (battleId) {
 				const battle = battleManager.getBattle(battleId);
-				if (battle && !battle.getState().isComplete) {
+				if (battle) {
 					battleManager.removeBattle(battleId);
 				}
 			}
-			resetBattleStore();
 		};
-	}, [generation, p1Team, p2Team, router, resetBattleStore, battleId]);
+	}, [generation, router, battleId]);
 
 	const handleReturnHome = () => {
 		if (battleId) {
 			battleManager.removeBattle(battleId);
 		}
-		resetBattleStore();
 		router.push("/");
 	};
 
@@ -391,45 +343,6 @@ export default function BattlePage() {
 
 
 ---
-app/pkmn-select/page.tsx
----
-"use client";
-import PokemonSelector from "../components/PokemonSelector";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { useSettings } from "../store/settings";
-import { getFormat } from "@/lib/constants";
-
-/**
- * Page for selecting a Pokemon to battle with
- */
-export default function SelectPokemonPage() {
-	const { generation } = useSettings();
-	return (
-		<main className="container mx-auto py-8 px-4">
-			<Card>
-				<CardHeader>
-					<CardTitle className="text-3xl">Select Your Pokemon</CardTitle>
-					<CardDescription>
-						Choose one Pokemon to use in your battle. You'll get 4 random moves
-						from its moveset. The format is <pre>{getFormat(generation)}</pre>
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<PokemonSelector />
-				</CardContent>
-			</Card>
-		</main>
-	);
-}
-
-
----
 app/utils/pokemonUtils.ts
 ---
 import { Generations, type Specie, type GenerationNum } from "@pkmn/data";
@@ -448,7 +361,9 @@ export type PokemonWithMoves = {
  * Generate a random Pokemon for a specific generation
  * @param generation - The generation number
  */
-export async function getRandomPokemon(generation: GenerationNum): Promise<PokemonWithMoves> {
+export async function getRandomPokemon(
+	generation: GenerationNum,
+): Promise<PokemonWithMoves> {
 	const gens = new Generations(Dex);
 	const gen = gens.get(generation);
 
@@ -476,7 +391,7 @@ export async function getRandomPokemon(generation: GenerationNum): Promise<Pokem
  */
 export async function getRandomMovesForPokemon(
 	pokemon: Specie,
-	generation: GenerationNum
+	generation: GenerationNum,
 ): Promise<string[]> {
 	try {
 		const gens = new Generations(Dex);
@@ -527,86 +442,49 @@ export async function getRandomMovesForPokemon(
 }
 
 /**
- * Get the sprite URL for a Pokemon
- * @param pokemon - The Pokemon data
- * @param player - The player side ("p1" or "p2")
- * @param generation - The generation number
+ * Get the sprite URL for a Pokémon
  */
-export const getSprite = (pokemon: Pokemon, player: "p1" | "p2", generation: GenerationNum) => {
-	return Sprites.getPokemon(pokemon.speciesForme, {
-		side: player,
-		gender: pokemon.gender || undefined,
-		gen: getGraphics(generation),
+export function getSprite(
+	pokemon: Pokemon,
+	player: "p1" | "p2",
+	generation: number = 3,
+): string {
+	// Get species name in the format expected by @pkmn/img
+	const species = pokemon.speciesForme.toLowerCase();
+
+	// Get sprite options
+	const options = {
+		gen: generation,
 		shiny: pokemon.shiny,
-	});
-}
-
----
-app/components/BackgroundMusic.tsx
----
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Volume2, VolumeX } from "lucide-react";
-
-export default function BackgroundMusic() {
-	const [audio] = useState(
-		typeof Audio !== "undefined" ? new Audio("/audio/battle-theme.mp3") : null,
-	);
-	const [isPlaying, setIsPlaying] = useState(false);
-
-	useEffect(() => {
-		if (audio) {
-			audio.loop = true;
-			audio.volume = 0.4;
-
-			const playAudio = async () => {
-				try {
-					await audio.play();
-					setIsPlaying(true);
-				} catch (err) {
-					console.error("Failed to play audio:", err);
-				}
-			};
-		}
-
-		return () => {
-			if (audio) {
-				audio.pause();
-				audio.currentTime = 0;
-			}
-		};
-	}, [audio]);
-
-	const togglePlay = async () => {
-		if (!audio) return;
-
-		if (isPlaying) {
-			audio.pause();
-		} else {
-			try {
-				await audio.play();
-			} catch (err) {
-				console.error("Failed to play audio:", err);
-			}
-		}
-		setIsPlaying(!isPlaying);
+		gender: pokemon.gender,
+		side: player,
+		mod: "ani", // Use animated sprites
 	};
 
-	return (
-		<Button
-			variant="ghost"
-			size="icon"
-			className="fixed top-4 right-4 z-50"
-			onClick={togglePlay}
-			title={isPlaying ? "Mute music" : "Play music"}
-		>
-			{isPlaying ? (
-				<Volume2 className="h-6 w-6" />
-			) : (
-				<VolumeX className="h-6 w-6" />
-			)}
-		</Button>
-	);
+	// Get sprite URL using static method
+	return Sprites.getPokemon(species, options).url;
+}
+
+/**
+ * Parse HP and status from condition string
+ */
+export function parseCondition(pokemon?: Pokemon | null) {
+	if (!pokemon) return { currentHP: 0, maxHP: 0, status: "" };
+
+	const currentHP = pokemon.hp;
+	const maxHP = pokemon.maxhp;
+	const status = pokemon.status;
+
+	return { currentHP, maxHP, status };
+}
+
+/**
+ * Get HP bar color based on percentage
+ */
+export function getHPColor(percentage: number): string {
+	if (percentage > 50) return "bg-green-500";
+	if (percentage > 20) return "bg-yellow-500";
+	return "bg-red-500";
 }
 
 
@@ -616,199 +494,70 @@ app/components/BattleMoveButton.tsx
 import React from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { TYPE_COLORS } from "@/lib/constants";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import type { Move } from "@pkmn/dex";
-import { cn } from "@/lib/utils";
-import { Separator } from "./ui/separator";
-import { Check } from "lucide-react";
+import { TYPE_COLORS } from "@/lib/constants";
 
-export interface BattleMoveButtonProps {
-	move: Move;
+interface BattleMoveButtonProps {
+	moveId: string;
+	name: string;
+	type: string;
+	pp: number;
+	maxPp: number;
 	disabled?: boolean;
 	isDisabled?: boolean;
 	disabledReason?: string;
-	pp?: number;
-	maxPp?: number;
-	isSelected?: boolean;
 	onClick: () => void;
 }
 
+/**
+ * Button component for displaying and selecting a Pokémon move
+ */
 export default function BattleMoveButton({
-	move,
+	moveId,
+	name,
+	type,
+	pp,
+	maxPp,
 	disabled,
 	isDisabled,
 	disabledReason,
-	pp,
-	maxPp,
-	isSelected,
 	onClick,
 }: BattleMoveButtonProps) {
-	const isButtonDisabled =
-		disabled || isDisabled || (pp !== undefined && pp <= 0);
-	const tooltipContent = isDisabled
-		? disabledReason
-		: move.desc || move.shortDesc;
+	const typeClass = TYPE_COLORS[type.toLowerCase() as keyof typeof TYPE_COLORS] || "bg-gray-400 text-white";
 
-	// Calculate PP status for styling
-	const ppPercentage = pp !== undefined && maxPp ? (pp / maxPp) * 100 : 100;
-	let ppColor = "text-emerald-500";
-	if (ppPercentage <= 50) ppColor = "text-yellow-500";
-	if (ppPercentage <= 25) ppColor = "text-red-500";
-	if (ppPercentage <= 0) ppColor = "text-gray-400";
-
-	// Format move priority for display
-	const getPriorityText = (priority: number) => {
-		if (priority > 0) return `+${priority} (Goes first)`;
-		if (priority < 0) return `${priority} (Goes last)`;
-		return "0 (Normal)";
-	};
-
-	return (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<Button
-					variant={isSelected ? "default" : "outline"}
-					className={cn(
-						"relative w-full h-full p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200",
-						isButtonDisabled && "opacity-50 cursor-not-allowed",
-						isSelected &&
-							!isButtonDisabled &&
-							"ring-2 ring-offset-2 ring-primary shadow-lg transform scale-[1.02]",
-						!isButtonDisabled &&
-							!isSelected &&
-							"hover:bg-accent/50 hover:scale-[1.01]",
-						TYPE_COLORS[move.type] &&
-							isSelected &&
-							`${TYPE_COLORS[move.type]} text-white`,
-					)}
-					onClick={onClick}
-					disabled={isButtonDisabled}
-				>
-					{isSelected && !isButtonDisabled && (
-						<div className="absolute -top-2 -right-2 bg-primary text-white rounded-full p-1 shadow-md">
-							<Check size={12} />
-						</div>
-					)}
-					<div className="flex items-center justify-between w-full">
-						<span
-							className={cn(
-								"font-medium",
-								isSelected && !isButtonDisabled && "text-white font-semibold",
-							)}
-						>
-							{move.name}
-						</span>
-					</div>
-					<div className="flex items-center gap-2 flex-wrap justify-center">
-						<Badge
-							variant={isSelected ? "default" : "secondary"}
-							className={cn(
-								"text-xs px-2 py-0",
-								!isSelected && `${TYPE_COLORS[move.type]} text-white`,
-								isSelected && !isButtonDisabled && "bg-white/20 text-white",
-							)}
-						>
-							{move.type}
-						</Badge>
-						{isDisabled && (
-							<Badge variant="destructive" className="text-xs px-2 py-0">
-								Disabled
-							</Badge>
-						)}
-						{pp === 0 && (
-							<Badge variant="destructive" className="text-xs px-2 py-0">
-								No PP
-							</Badge>
-						)}
-					</div>
-				</Button>
-			</TooltipTrigger>
-			<TooltipContent
-				side="top"
-				className="w-80 p-4 bg-[#0F1729] border-[#1D283A] shadow-xl"
-			>
-				<div className="space-y-3">
-					{/* Move Header */}
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-2">
-							<span className="text-lg font-semibold text-white">
-								{move.name}
-							</span>
-							<Badge
-								variant="outline"
-								className={cn(
-									"text-xs border-0",
-									TYPE_COLORS[move.type],
-									"text-white",
-								)}
-							>
-								{move.type}
-							</Badge>
-						</div>
-						<Badge variant="outline" className="border-[#1D283A] text-white">
-							{move.category || "Special"}
-						</Badge>
-					</div>
-
-					{/* Move Stats */}
-					<div className="grid grid-cols-3 gap-2 text-sm">
-						<div className="space-y-1">
-							<p className="text-[#64748B]">Power</p>
-							<p className="font-medium text-white">{move.basePower || "-"}</p>
-						</div>
-						<div className="space-y-1">
-							<p className="text-[#64748B]">Accuracy</p>
-							<p className="font-medium text-white">
-								{move.accuracy === true ? "Never Misses" : move.accuracy || "-"}
-							</p>
-						</div>
-						<div className="space-y-1">
-							<p className="text-[#64748B]">Priority</p>
-							<p className="font-medium text-white">
-								{getPriorityText(move.priority || 0)}
-							</p>
-						</div>
-					</div>
-
-					<Separator className="bg-[#1D283A]" />
-
-					{/* Move Description */}
-					<div className="space-y-2">
-						<p className="text-sm leading-relaxed text-[#94A3B8]">
-							{isDisabled ? (
-								<span className="text-red-400 font-medium">
-									{disabledReason}
-								</span>
-							) : (
-								tooltipContent
-							)}
-						</p>
-					</div>
-
-					{/* PP Warning */}
-					{pp !== undefined && maxPp !== undefined && (
-						<div
-							className={cn(
-								"text-sm font-medium rounded-lg p-2",
-								pp <= 5
-									? "bg-red-950/50 text-red-400 border border-red-900/50"
-									: "bg-[#1D283A] text-[#94A3B8]",
-							)}
-						>
-							{pp <= 5 ? (
-								<span>⚠️ Warning: Low PP remaining!</span>
-							) : (
-								<span>
-									PP: {pp}/{maxPp} remaining
-								</span>
-							)}
-						</div>
-					)}
-				</div>
-			</TooltipContent>
-		</Tooltip>
+	const button = (
+		<Button
+			variant="outline"
+			className={`w-full h-full p-2 flex flex-col items-center justify-between gap-1 ${
+				disabled ? "opacity-50" : ""
+			}`}
+			disabled={disabled}
+			onClick={onClick}
+		>
+			<div className="flex items-center justify-between w-full">
+				<span className="font-medium">{name}</span>
+				<Badge variant="outline" className={typeClass}>
+					{type}
+				</Badge>
+			</div>
+			<div className="text-sm text-gray-500 self-end">
+				PP: {pp}/{maxPp}
+			</div>
+		</Button>
 	);
+
+	if (isDisabled && disabledReason) {
+		return (
+			<Tooltip>
+				<TooltipTrigger asChild>{button}</TooltipTrigger>
+				<TooltipContent>
+					<p>{disabledReason}</p>
+				</TooltipContent>
+			</Tooltip>
+		);
+	}
+
+	return button;
 }
 
 
@@ -819,14 +568,14 @@ app/components/BattleView.tsx
 
 import React, { useState, useEffect, useRef } from "react";
 import type { BattleState } from "../services/battle-types";
-import type { Pokemon } from "@pkmn/client";
+import type { Pokemon, Battle } from "@pkmn/client";
 import type { BattleEngine } from "../services/battle-engine";
 import { TYPE_COLORS } from "@/lib/constants";
 import BattleMoveButton from "./BattleMoveButton";
 import { Badge } from "./ui/badge";
 import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { getSprite } from "../utils/pokemonUtils";
+import { getSprite, parseCondition, getHPColor } from "../utils/pokemonUtils";
 import { battleManager } from "@/services/battle-manager-instance";
 import { useSettings } from "@/store/settings";
 
@@ -879,12 +628,23 @@ export default function BattleView({ battleId }: BattleViewProps) {
 			if (!mounted) return;
 
 			battleEngineRef.current = engine;
+
+			// Create a custom Battle type that extends @pkmn/client's Battle
+			const battle = engine.getBattle() as Battle & {
+				format?: string;
+				currentTurn?: number;
+				weather?: string;
+				winner?: string | null;
+				ended?: boolean;
+			};
+
 			setViewState({
-				battle: engine.getBattle(),
-				logs: engine.getLogs(),
+				battle,
+				logs: [...engine.getLogs()], // Create a new array to avoid readonly issues
 				p1Request: engine.getP1Request(),
-				p2Request: engine.getP2Request()
+				p2Request: engine.getP2Request(),
 			});
+
 			setError(null);
 			setRetryCount(0);
 
@@ -899,14 +659,17 @@ export default function BattleView({ battleId }: BattleViewProps) {
 			const unsubscribeEnd = engine.on("battleEnd", ({ winner, state }) => {
 				if (mounted) {
 					console.log(`Battle ${battleId} ended. Winner: ${winner}`);
-					setViewState(prev => prev ? {
-						...prev,
-						battle: state
-					} : null);
+					setViewState((prev) =>
+						prev
+							? {
+									...prev,
+									battle: state as Battle & { winner?: string | null },
+								}
+							: null,
+					);
 				}
 			});
 
-			// Cleanup: unsubscribe when component unmounts or battleId changes
 			return () => {
 				unsubscribe();
 				unsubscribeEnd();
@@ -929,28 +692,10 @@ export default function BattleView({ battleId }: BattleViewProps) {
 	// Handle player decisions
 	const handlePlayerDecision = (player: "p1" | "p2", moveIndex: number) => {
 		if (!battleEngineRef.current) return;
-		battleEngineRef.current.processPlayerDecision(player, { type: "move", moveIndex });
-	};
-
-	// Handle move selection for player 1
-	const handleP1MoveSelect = (moveIndex: number) => {
-		handlePlayerDecision("p1", moveIndex);
-	};
-
-	// Handle move selection for player 2
-	const handleP2MoveSelect = (moveIndex: number) => {
-		handlePlayerDecision("p2", moveIndex);
-	};
-
-	// Parse HP and status from condition string
-	const parseCondition = (pokemon?: Pokemon | null) => {
-		if (!pokemon) return { currentHP: 0, maxHP: 0, status: "" };
-
-		const currentHP = pokemon.hp;
-		const maxHP = pokemon.maxhp;
-		const status = pokemon.status;
-
-		return { currentHP, maxHP, status };
+		battleEngineRef.current.processPlayerDecision(player, {
+			type: "move",
+			moveIndex,
+		});
 	};
 
 	// Render player's Pokémon information
@@ -963,7 +708,7 @@ export default function BattleView({ battleId }: BattleViewProps) {
 
 		if (!pokemon) return <div>No active Pokémon</div>;
 
-		const sprite = getSprite(pokemon, player, generation);
+		const spriteUrl = getSprite(pokemon, player, generation);
 		const itemData = pokemonFromRequest?.item
 			? battleEngineRef.current?.getItem(pokemonFromRequest.item)
 			: null;
@@ -971,26 +716,22 @@ export default function BattleView({ battleId }: BattleViewProps) {
 			? battleEngineRef.current?.getAbility(pokemonFromRequest.baseAbility)
 			: null;
 
-		// Extract HP information from condition
+		// Extract HP information
 		const { currentHP, maxHP, status } = parseCondition(pokemon);
-
-		// Calculate HP percentage
 		const hpPercentage = maxHP > 0 ? (currentHP / maxHP) * 100 : 0;
-		let hpColor = "bg-green-500"; // Green
-		if (hpPercentage <= 50) hpColor = "bg-yellow-500"; // Yellow
-		if (hpPercentage <= 20) hpColor = "bg-red-500"; // Red
+		const hpColor = getHPColor(hpPercentage);
 
 		return (
 			<div className="flex flex-col items-center space-y-4">
 				<div className="relative">
 					<img
-						src={sprite}
+						src={spriteUrl}
 						alt={pokemon.name}
-						className="w-32 h-32 object-contain"
+						className="w-32 h-32 object-contain pixelated"
 					/>
 					{status && (
-						<Badge variant="secondary" className="absolute bottom-0 right-0">
-							{status}
+						<Badge className={`absolute bottom-0 right-0 ${getStatusClass(status)}`}>
+							{getStatusName(status)}
 						</Badge>
 					)}
 				</div>
@@ -1007,9 +748,7 @@ export default function BattleView({ battleId }: BattleViewProps) {
 						<div className="h-2 w-full bg-gray-200 rounded-full">
 							<div
 								className={`h-full ${hpColor} rounded-full`}
-								style={{
-									width: `${hpPercentage}%`,
-								}}
+								style={{ width: `${hpPercentage}%` }}
 							/>
 						</div>
 						<p className="text-sm mt-1">
@@ -1017,15 +756,29 @@ export default function BattleView({ battleId }: BattleViewProps) {
 						</p>
 					</div>
 					{itemData && (
-						<p className="text-sm mt-1">
-							<span className="font-semibold">Item:</span> {itemData.name}
-						</p>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<p className="text-sm mt-1 cursor-help">
+									<span className="font-semibold">Item:</span> {itemData.name}
+								</p>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p>{itemData.desc}</p>
+							</TooltipContent>
+						</Tooltip>
 					)}
 					{abilityData && (
-						<p className="text-sm">
-							<span className="font-semibold">Ability:</span>{" "}
-							{abilityData.name}
-						</p>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<p className="text-sm cursor-help">
+									<span className="font-semibold">Ability:</span>{" "}
+									{abilityData.name}
+								</p>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p>{abilityData.desc}</p>
+							</TooltipContent>
+						</Tooltip>
 					)}
 				</div>
 			</div>
@@ -1034,13 +787,20 @@ export default function BattleView({ battleId }: BattleViewProps) {
 
 	// Render available moves for a player
 	const renderMoves = (player: "p1" | "p2") => {
-		const request = player === "p1" ? viewState?.p1Request : viewState?.p2Request;
+		const request =
+			player === "p1" ? viewState?.p1Request : viewState?.p2Request;
 
 		if (!request?.active?.[0]) {
-			if (viewState?.battle?.request?.wait) {
-				return <div className="text-gray-500 italic">Waiting for opponent...</div>;
+			if (request?.wait) {
+				return (
+					<div className="text-gray-500 italic">Waiting for opponent...</div>
+				);
 			}
-			return <div className="text-gray-500 italic">No move selection needed now.</div>;
+			return (
+				<div className="text-gray-500 italic">
+					No move selection needed now.
+				</div>
+			);
 		}
 
 		const moves = request.active[0].moves || [];
@@ -1057,20 +817,19 @@ export default function BattleView({ battleId }: BattleViewProps) {
 					return (
 						<BattleMoveButton
 							key={move.id}
-							move={moveData}
-							disabled={isButtonDisabled}
-							isDisabled={isDisabled}
-							disabledReason={isDisabled ? "Move disabled by an effect" : undefined}
+							moveId={move.id}
+							name={moveData.name}
+							type={moveData.type}
 							pp={move.pp}
 							maxPp={move.maxpp}
-							isSelected={false}
+							disabled={isButtonDisabled}
+							isDisabled={isDisabled}
+							disabledReason={
+								isDisabled ? "Move disabled by an effect" : undefined
+							}
 							onClick={() => {
 								if (isButtonDisabled) return;
-								if (player === "p1") {
-									handleP1MoveSelect(index + 1);
-								} else {
-									handleP2MoveSelect(index + 1);
-								}
+								handlePlayerDecision(player, index + 1);
 							}}
 						/>
 					);
@@ -1081,23 +840,23 @@ export default function BattleView({ battleId }: BattleViewProps) {
 
 	// Render battle logs
 	const renderBattleLogs = () => {
-		if (!viewState?.battle) return <div>Loading battle logs...</div>;
+		if (!viewState?.logs) return null;
 
 		return (
-			<div className="h-full flex flex-col">
-				<h3 className="text-lg font-semibold mb-3">Battle Log</h3>
-				<pre className="text-sm font-medium bg-gray-100 border-gray-200 p-1 rounded">
-					Format: {viewState.battle.format} Turn: {viewState.battle.turn}
-				</pre>
-				<div className="flex-1 overflow-y-auto mt-3 space-y-1 pr-2">
-					{viewState.logs.map((log, index) => (
+			<div className="h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg">
+				{viewState.logs.map((log, index) => {
+					// Create a unique key using turn number and index
+					const key = `${viewState.battle.turn}-${index}`;
+					// Sanitize the HTML content (you should add a proper HTML sanitizer library)
+					return (
 						<div
-							key={`${battleId}-log-${index}`}
-							className="text-sm leading-relaxed protocol-line"
+							key={key}
+							className="mb-1 protocol-line"
+							// biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
 							dangerouslySetInnerHTML={{ __html: log }}
 						/>
-					))}
-				</div>
+					);
+				})}
 			</div>
 		);
 	};
@@ -1119,29 +878,37 @@ export default function BattleView({ battleId }: BattleViewProps) {
 		return <div className="text-center p-4">Loading battle state...</div>;
 	}
 
+	const battle = viewState.battle as Battle & {
+		format?: string;
+		currentTurn?: number;
+		weather?: string;
+		winner?: string | null;
+		ended?: boolean;
+	};
+
 	return (
 		<div className="flex flex-col w-full max-w-7xl mx-auto p-6 space-y-6">
 			{/* Battle Header */}
 			<div className="flex items-center justify-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
 				<div className="flex items-center gap-2">
 					<Badge variant="outline" className="text-lg px-4 py-2">
-						Turn: {viewState.battle.turn}
+						Turn: {battle.turn}
 					</Badge>
 					<Badge variant="secondary" className="text-lg px-4 py-2">
-						Current Turn: {viewState.battle.currentTurn || viewState.battle.turn}
+						Current Turn: {battle.currentTurn || battle.turn}
 					</Badge>
 				</div>
-				{viewState.battle.weather !== "none" && (
+				{battle.weather && battle.weather !== "none" && (
 					<Badge variant="outline" className="text-lg px-4 py-2">
-						{viewState.battle.weather}
+						{battle.weather}
 					</Badge>
 				)}
-				{viewState.battle.winner && (
+				{battle.winner && (
 					<Badge variant="destructive" className="text-lg px-4 py-2">
-						Winner: {viewState.battle.winner}
+						Winner: {battle.winner}
 					</Badge>
 				)}
-				{viewState.battle.ended && !viewState.battle.winner && (
+				{battle.ended && !battle.winner && (
 					<Badge variant="secondary" className="text-lg px-4 py-2">
 						Result: Tie
 					</Badge>
@@ -1157,9 +924,7 @@ export default function BattleView({ battleId }: BattleViewProps) {
 				</div>
 
 				{/* Battle Log */}
-				<div className="col-span-1">
-					{renderBattleLogs()}
-				</div>
+				<div className="col-span-1">{renderBattleLogs()}</div>
 
 				{/* Player 2 */}
 				<div className="col-span-1">
@@ -1170,1455 +935,6 @@ export default function BattleView({ battleId }: BattleViewProps) {
 		</div>
 	);
 }
-
-
----
-app/components/GenerationSelector.tsx
----
-import { useSettings } from "@/app/store/settings";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import type { GenerationNum } from "@pkmn/types";
-
-export function GenerationSelector() {
-	const { generation, setGeneration } = useSettings();
-
-	const generations = Array.from(
-		{ length: 9 },
-		(_, i) => (i + 1) as GenerationNum,
-	);
-
-	return (
-		<Select
-			value={generation.toString()}
-			onValueChange={(value) =>
-				setGeneration(Number.parseInt(value) as GenerationNum)
-			}
-		>
-			<SelectTrigger className="w-[180px]">
-				<SelectValue placeholder="Select Generation" />
-			</SelectTrigger>
-			<SelectContent>
-				{generations.map((gen) => (
-					<SelectItem key={gen} value={gen.toString()}>
-						Generation {gen}
-					</SelectItem>
-				))}
-			</SelectContent>
-		</Select>
-	);
-}
-
-
----
-app/components/MoveButton.tsx
----
-import React from "react";
-
-type MoveButtonProps = {
-	move: string;
-	isSelected: boolean;
-	onClick: () => void;
-	disabled?: boolean;
-};
-
-/**
- * Pure UI component for a single move button
- */
-export default function MoveButton({
-	move,
-	isSelected,
-	onClick,
-	disabled = false,
-}: MoveButtonProps) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			disabled={disabled}
-			className={`
-        py-2 px-3 rounded text-sm capitalize border
-        ${
-					isSelected
-						? "bg-green-500 text-white border-green-600"
-						: "bg-white hover:bg-gray-100 border-gray-300"
-				}
-        ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-      `}
-		>
-			{move.replace(/-/g, " ")}
-		</button>
-	);
-}
-
-
----
-app/components/MoveList.tsx
----
-import React from "react";
-import MoveButton from "./MoveButton";
-
-type MoveListProps = {
-	moves: string[];
-	selectedMove?: string;
-	onSelectMove?: (move: string) => void;
-	disabled?: boolean;
-	title?: string;
-	className?: string;
-};
-
-/**
- * Pure UI component for displaying a grid of move buttons
- */
-export default function MoveList({
-	moves,
-	selectedMove,
-	onSelectMove,
-	disabled = false,
-	title = "Moves",
-	className = "",
-}: MoveListProps) {
-	return (
-		<div className={`p-4 ${className}`}>
-			<h4 className="font-medium mb-2">{title}:</h4>
-
-			{moves.length === 0 ? (
-				<p className="text-sm italic">No moves available</p>
-			) : (
-				<div className="grid grid-cols-2 gap-2">
-					{moves.map((move) => (
-						<MoveButton
-							key={move}
-							move={move}
-							isSelected={selectedMove === move}
-							onClick={() => onSelectMove?.(move)}
-							disabled={disabled}
-						/>
-					))}
-				</div>
-			)}
-		</div>
-	);
-}
-
-
----
-app/components/PokemonCard.tsx
----
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import MoveList from "./MoveList";
-import type { PokemonWithMoves } from "../utils/pokemonUtils";
-import { Badge } from "./ui/badge";
-import { TYPE_COLORS } from "@/lib/constants";
-
-type PokemonCardProps = {
-	pokemon: PokemonWithMoves;
-	side?: "user" | "opponent";
-	className?: string;
-	showMoves?: boolean;
-	selectedMove?: string;
-	onSelectMove?: (move: string) => void;
-	disabledMoves?: boolean;
-	movesTitle?: string;
-};
-
-/**
- * Reusable component to display a single Pokémon and optionally its moves
- */
-export default function PokemonCard({
-	pokemon,
-	side = "user",
-	className = "",
-	showMoves = false,
-	selectedMove = "",
-	onSelectMove,
-	disabledMoves = false,
-	movesTitle,
-}: PokemonCardProps) {
-	const { pokemon: pokemonData, moves } = pokemon;
-
-	const bgColor =
-		side === "user"
-			? "from-blue-500/10 to-blue-500/5"
-			: "from-red-500/10 to-red-500/5";
-	const glowColor =
-		side === "user"
-			? "from-blue-500/25 via-blue-500/5 to-transparent"
-			: "from-red-500/25 via-red-500/5 to-transparent";
-	const defaultMovesTitle = side === "user" ? "Your Moves" : "Opponent Moves";
-
-	const handleMoveSelect = (move: string) => {
-		if (onSelectMove) {
-			onSelectMove(move);
-		}
-	};
-
-	return (
-		<Card
-			className={cn(
-				"overflow-hidden transition-all duration-200 backdrop-blur-sm bg-gradient-to-b",
-				bgColor,
-				className,
-			)}
-		>
-			<CardHeader className="p-4">
-				<div className="flex flex-col items-center gap-2 mb-2">
-					<div className="flex items-center justify-between w-full">
-						<span className="text-sm text-muted-foreground">
-							#{pokemonData.num.toString().padStart(3, "0")}
-						</span>
-						<span className="text-xl font-semibold capitalize tracking-tight mx-2">
-							{pokemonData.name.replace(/-/g, " ")}
-						</span>
-						<div className="flex gap-1">
-							{pokemonData.types.map((type) => (
-								<Badge
-									key={type}
-									variant="secondary"
-									className={`${TYPE_COLORS[type]} text-white text-xs px-2 py-0`}
-								>
-									{type}
-								</Badge>
-							))}
-						</div>
-					</div>
-				</div>
-			</CardHeader>
-			<CardContent className="p-6 pt-0">
-				<div className="flex flex-col items-center">
-					<div className="relative w-40 h-40 flex items-center justify-center group">
-						{/* Glow effect */}
-						<div
-							className={cn(
-								"absolute inset-0 bg-gradient-radial opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-2xl -z-10",
-								glowColor,
-							)}
-						/>
-						<img
-							src={pokemonData.sprite}
-							alt={pokemonData.name}
-							className="w-full h-full object-contain relative z-10 drop-shadow-xl transform group-hover:scale-110 transition-all duration-300 will-change-transform"
-							loading="lazy"
-						/>
-					</div>
-				</div>
-
-				{/* Show moves if requested */}
-				{showMoves && moves.length > 0 && (
-					<div className="mt-6">
-						<MoveList
-							moves={moves}
-							selectedMove={selectedMove}
-							onSelectMove={handleMoveSelect}
-							disabled={disabledMoves}
-							title={movesTitle || defaultMovesTitle}
-							className="mt-2"
-						/>
-					</div>
-				)}
-			</CardContent>
-		</Card>
-	);
-}
-
-
----
-app/components/PokemonSelector.tsx
----
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { Generations, type Specie } from "@pkmn/data";
-import { Teams } from "@pkmn/sim";
-import { Dex } from "@pkmn/dex";
-import { Sprites } from "@pkmn/img";
-import { TYPE_COLORS } from "@/lib/constants";
-import { getRandomMovesForPokemon } from "../utils/pokemonUtils";
-import PokemonCard from "./PokemonCard";
-import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Swords } from "lucide-react";
-import { useBattleStore } from "@/app/store/battle-store";
-import { useRouter } from "next/navigation";
-import { useSettings } from "@/app/store/settings";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-
-export type PokemonData = Specie & {
-	sprite: string;
-};
-
-/**
- * Component for selecting a single Pokemon
- */
-export default function PokemonSelector() {
-	const router = useRouter();
-	const {
-		setSelectedPokemon,
-		setSelectedMoves,
-		selectedMoves,
-		selectedPokemon,
-		setOpponentPokemon,
-		setOpponentMoves,
-		setP1Team,
-		setP2Team,
-	} = useBattleStore();
-	const [allPokemon, setAllPokemon] = useState<PokemonData[]>([]);
-	const [selectedPokemonId, setSelectedPokemonId] = useState<string>("");
-	const [isLoading, setIsLoading] = useState(true);
-	const [isLoadingMoves, setIsLoadingMoves] = useState(false);
-	const [isStartingBattle, setIsStartingBattle] = useState(false);
-	const { generation } = useSettings();
-
-	// Memoize the sorted Pokemon list
-	const sortedPokemon = useMemo(() => {
-		return [...allPokemon].sort((a, b) => a.num - b.num);
-	}, [allPokemon]);
-
-	useEffect(() => {
-		// Initialize the generations using the Dex
-		const fetchPokemonData = async () => {
-			try {
-				const gens = new Generations(Dex);
-				const gen = gens.get(generation);
-
-				// Get all Pokemon from the selected generation
-				const pokemonList = Array.from(gen.species).map((species) => {
-					// Get sprite URL using @pkmn/img
-					const spriteUrl = Sprites.getPokemon(species.name, {
-						gen: generation,
-						side: "p2",
-					}).url;
-
-					return {
-						...species,
-						sprite: spriteUrl,
-					};
-				});
-
-				// @ts-ignore
-				setAllPokemon(pokemonList);
-				setIsLoading(false);
-			} catch (error) {
-				console.error("Error loading Pokemon data:", error);
-				setIsLoading(false);
-			}
-		};
-
-		fetchPokemonData();
-	}, [generation]);
-
-	const getRandomMoves = useCallback(
-		async (pokemonId: string) => {
-			setIsLoadingMoves(true);
-			try {
-				const pokemon = allPokemon.find((p) => p.id === pokemonId);
-				if (!pokemon) {
-					throw new Error(`Pokemon ${pokemonId} not found`);
-				}
-				const moves = await getRandomMovesForPokemon(pokemon, generation);
-
-				if (pokemon) {
-					setSelectedMoves(moves);
-					setSelectedPokemon(pokemon);
-				}
-			} catch (error) {
-				console.error("Error getting moves:", error);
-				setSelectedMoves([]);
-				setSelectedPokemon(null);
-			} finally {
-				setIsLoadingMoves(false);
-			}
-		},
-		[allPokemon, setSelectedMoves, setSelectedPokemon, generation],
-	);
-
-	const handleSelectChange = useCallback(
-		async (value: string) => {
-			setSelectedPokemonId(value);
-
-			if (value) {
-				await getRandomMoves(value);
-			} else {
-				setSelectedMoves([]);
-				setSelectedPokemon(null);
-			}
-		},
-		[getRandomMoves, setSelectedMoves, setSelectedPokemon],
-	);
-
-	const handleStartBattle = useCallback(async () => {
-		if (!selectedPokemon) return;
-
-		setIsStartingBattle(true);
-		try {
-			// Select a random opponent
-			const availablePokemon = allPokemon.filter(
-				(p) => p.id !== selectedPokemon.id,
-			);
-			const randomOpponent =
-				availablePokemon[Math.floor(Math.random() * availablePokemon.length)];
-
-			// Get moves for the opponent
-			const opponentMoves = await getRandomMovesForPokemon(randomOpponent, generation);
-
-			// Set opponent data
-			setOpponentPokemon(randomOpponent);
-			setOpponentMoves(opponentMoves);
-
-			// Generate team strings for both players
-			// @ts-ignore
-			const p1Team = Teams.exportSet({
-				name: selectedPokemon.name,
-				species: selectedPokemon.baseSpecies,
-				moves: selectedMoves,
-			});
-
-			// @ts-ignore
-			const p2Team = Teams.exportSet({
-				name: randomOpponent.name,
-				species: randomOpponent.baseSpecies,
-				moves: opponentMoves,
-			});
-
-			setP1Team(p1Team);
-			setP2Team(p2Team);
-
-			// Navigate to battle page
-			router.push("/battle");
-		} catch (error) {
-			console.error("Error starting battle:", error);
-		} finally {
-			setIsStartingBattle(false);
-		}
-	}, [
-		selectedPokemon,
-		allPokemon,
-		setOpponentPokemon,
-		setOpponentMoves,
-		selectedMoves,
-		setP1Team,
-		setP2Team,
-		router,
-		generation,
-	]);
-
-	if (isLoading) {
-		return (
-			<div className="flex items-center justify-center p-4">
-				<Loader2 className="h-6 w-6 animate-spin" />
-				<span className="ml-2">Loading Pokemon data...</span>
-			</div>
-		);
-	}
-
-	// Find the selected Pokemon object
-	const selectedPokemonData = selectedPokemonId
-		? allPokemon.find((p) => p.id === selectedPokemonId)
-		: null;
-
-	return (
-		<div className="w-full space-y-6">
-			<Select value={selectedPokemonId} onValueChange={handleSelectChange}>
-				<SelectTrigger className="w-full">
-					<SelectValue placeholder="Select a Pokemon..." />
-				</SelectTrigger>
-				<SelectContent className="max-h-[300px]">
-					<ScrollArea className="h-[300px]">
-						{sortedPokemon.map((pokemon) => (
-							<SelectItem
-								key={pokemon.id}
-								value={pokemon.id}
-								className="flex items-center gap-2 py-2 hover:bg-accent/50 transition-colors"
-							>
-								<img
-									src={pokemon.sprite}
-									alt={pokemon.name}
-									className="w-10 h-10 object-contain"
-									loading="lazy"
-								/>
-								<span className="text-sm text-muted-foreground mr-1">
-									#{pokemon.num.toString().padStart(3, "0")}
-								</span>
-								<span className="font-medium capitalize">
-									{pokemon.name.replace(/-/g, " ")}
-								</span>
-								<div className="flex gap-1 ml-auto">
-									{pokemon.types.map((type) => (
-										<Badge
-											key={type}
-											variant="secondary"
-											className={`${TYPE_COLORS[type]} text-white text-xs px-2 py-0`}
-										>
-											{type}
-										</Badge>
-									))}
-								</div>
-							</SelectItem>
-						))}
-					</ScrollArea>
-				</SelectContent>
-			</Select>
-
-			{selectedPokemonData && (
-				<Card className="overflow-hidden border-2">
-					<CardContent className="pt-6">
-						<PokemonCard
-							pokemon={{
-								pokemon: selectedPokemonData,
-								moves: selectedMoves,
-							}}
-							className="mb-4"
-							showMoves={true}
-							disabledMoves={isLoadingMoves}
-						/>
-
-						<div className="flex justify-center mt-6">
-							<Button
-								onClick={handleStartBattle}
-								disabled={!selectedPokemon || isStartingBattle}
-								className="w-full sm:w-auto"
-							>
-								{isStartingBattle ? (
-									<>
-										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										Starting Battle...
-									</>
-								) : (
-									<>
-										<Swords className="mr-2 h-4 w-4" />
-										Start Battle
-									</>
-								)}
-							</Button>
-						</div>
-					</CardContent>
-				</Card>
-			)}
-		</div>
-	);
-}
-
-
----
-app/components/ui/badge.tsx
----
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
-
-import { cn } from "@/lib/utils"
-
-const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
-  {
-    variants: {
-      variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
-        destructive:
-          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
-        outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
-
-function Badge({
-  className,
-  variant,
-  asChild = false,
-  ...props
-}: React.ComponentProps<"span"> &
-  VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "span"
-
-  return (
-    <Comp
-      data-slot="badge"
-      className={cn(badgeVariants({ variant }), className)}
-      {...props}
-    />
-  )
-}
-
-export { Badge, badgeVariants }
-
-
----
-app/components/ui/button.tsx
----
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
-
-import { cn } from "@/lib/utils"
-
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
-  {
-    variants: {
-      variant: {
-        default:
-          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
-        outline:
-          "border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
-
-function Button({
-  className,
-  variant,
-  size,
-  asChild = false,
-  ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot : "button"
-
-  return (
-    <Comp
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  )
-}
-
-export { Button, buttonVariants }
-
-
----
-app/components/ui/card.tsx
----
-import * as React from "react"
-
-import { cn } from "@/lib/utils"
-
-function Card({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card"
-      className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-header"
-      className={cn("flex flex-col gap-1.5 px-6", className)}
-      {...props}
-    />
-  )
-}
-
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
-      {...props}
-    />
-  )
-}
-
-function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-description"
-      className={cn("text-muted-foreground text-sm", className)}
-      {...props}
-    />
-  )
-}
-
-function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-content"
-      className={cn("px-6", className)}
-      {...props}
-    />
-  )
-}
-
-function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="card-footer"
-      className={cn("flex items-center px-6", className)}
-      {...props}
-    />
-  )
-}
-
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
-
-
----
-app/components/ui/command.tsx
----
-"use client"
-
-import * as React from "react"
-import { Command as CommandPrimitive } from "cmdk"
-import { SearchIcon } from "lucide-react"
-
-import { cn } from "@/lib/utils"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-
-function Command({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive>) {
-  return (
-    <CommandPrimitive
-      data-slot="command"
-      className={cn(
-        "bg-popover text-popover-foreground flex h-full w-full flex-col overflow-hidden rounded-md",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CommandDialog({
-  title = "Command Palette",
-  description = "Search for a command to run...",
-  children,
-  ...props
-}: React.ComponentProps<typeof Dialog> & {
-  title?: string
-  description?: string
-}) {
-  return (
-    <Dialog {...props}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </DialogHeader>
-      <DialogContent className="overflow-hidden p-0">
-        <Command className="[&_[cmdk-group-heading]]:text-muted-foreground **:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
-          {children}
-        </Command>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function CommandInput({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
-  return (
-    <div
-      data-slot="command-input-wrapper"
-      className="flex h-9 items-center gap-2 border-b px-3"
-    >
-      <SearchIcon className="size-4 shrink-0 opacity-50" />
-      <CommandPrimitive.Input
-        data-slot="command-input"
-        className={cn(
-          "placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
-          className
-        )}
-        {...props}
-      />
-    </div>
-  )
-}
-
-function CommandList({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.List>) {
-  return (
-    <CommandPrimitive.List
-      data-slot="command-list"
-      className={cn(
-        "max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CommandEmpty({
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Empty>) {
-  return (
-    <CommandPrimitive.Empty
-      data-slot="command-empty"
-      className="py-6 text-center text-sm"
-      {...props}
-    />
-  )
-}
-
-function CommandGroup({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Group>) {
-  return (
-    <CommandPrimitive.Group
-      data-slot="command-group"
-      className={cn(
-        "text-foreground [&_[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CommandSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
-  return (
-    <CommandPrimitive.Separator
-      data-slot="command-separator"
-      className={cn("bg-border -mx-1 h-px", className)}
-      {...props}
-    />
-  )
-}
-
-function CommandItem({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Item>) {
-  return (
-    <CommandPrimitive.Item
-      data-slot="command-item"
-      className={cn(
-        "data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function CommandShortcut({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
-  return (
-    <span
-      data-slot="command-shortcut"
-      className={cn(
-        "text-muted-foreground ml-auto text-xs tracking-widest",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export {
-  Command,
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandShortcut,
-  CommandSeparator,
-}
-
-
----
-app/components/ui/dialog.tsx
----
-"use client"
-
-import * as React from "react"
-import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { XIcon } from "lucide-react"
-
-import { cn } from "@/lib/utils"
-
-function Dialog({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
-}
-
-function DialogTrigger({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
-}
-
-function DialogPortal({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
-}
-
-function DialogClose({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
-}
-
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
-  return (
-    <DialogPrimitive.Overlay
-      data-slot="dialog-overlay"
-      className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DialogContent({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
-  return (
-    <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
-        className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
-          <XIcon />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
-    </DialogPortal>
-  )
-}
-
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
-      {...props}
-    />
-  )
-}
-
-function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="dialog-footer"
-      className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DialogTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
-      {...props}
-    />
-  )
-}
-
-function DialogDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
-      {...props}
-    />
-  )
-}
-
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
-}
-
-
----
-app/components/ui/popover.tsx
----
-"use client"
-
-import * as React from "react"
-import * as PopoverPrimitive from "@radix-ui/react-popover"
-
-import { cn } from "@/lib/utils"
-
-function Popover({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
-}
-
-function PopoverTrigger({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
-}
-
-function PopoverContent({
-  className,
-  align = "center",
-  sideOffset = 4,
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
-  return (
-    <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Content
-        data-slot="popover-content"
-        align={align}
-        sideOffset={sideOffset}
-        className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-72 rounded-md border p-4 shadow-md outline-hidden",
-          className
-        )}
-        {...props}
-      />
-    </PopoverPrimitive.Portal>
-  )
-}
-
-function PopoverAnchor({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
-  return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />
-}
-
-export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor }
-
-
----
-app/components/ui/scroll-area.tsx
----
-"use client"
-
-import * as React from "react"
-import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
-
-import { cn } from "@/lib/utils"
-
-function ScrollArea({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
-  return (
-    <ScrollAreaPrimitive.Root
-      data-slot="scroll-area"
-      className={cn("relative", className)}
-      {...props}
-    >
-      <ScrollAreaPrimitive.Viewport
-        data-slot="scroll-area-viewport"
-        className="ring-ring/10 dark:ring-ring/20 dark:outline-ring/40 outline-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] focus-visible:ring-4 focus-visible:outline-1"
-      >
-        {children}
-      </ScrollAreaPrimitive.Viewport>
-      <ScrollBar />
-      <ScrollAreaPrimitive.Corner />
-    </ScrollAreaPrimitive.Root>
-  )
-}
-
-function ScrollBar({
-  className,
-  orientation = "vertical",
-  ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
-  return (
-    <ScrollAreaPrimitive.ScrollAreaScrollbar
-      data-slot="scroll-area-scrollbar"
-      orientation={orientation}
-      className={cn(
-        "flex touch-none p-px transition-colors select-none",
-        orientation === "vertical" &&
-          "h-full w-2.5 border-l border-l-transparent",
-        orientation === "horizontal" &&
-          "h-2.5 flex-col border-t border-t-transparent",
-        className
-      )}
-      {...props}
-    >
-      <ScrollAreaPrimitive.ScrollAreaThumb
-        data-slot="scroll-area-thumb"
-        className="bg-border relative flex-1 rounded-full"
-      />
-    </ScrollAreaPrimitive.ScrollAreaScrollbar>
-  )
-}
-
-export { ScrollArea, ScrollBar }
-
-
----
-app/components/ui/select.tsx
----
-"use client"
-
-import * as React from "react"
-import * as SelectPrimitive from "@radix-ui/react-select"
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
-
-import { cn } from "@/lib/utils"
-
-function Select({
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
-}
-
-function SelectGroup({
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Group>) {
-  return <SelectPrimitive.Group data-slot="select-group" {...props} />
-}
-
-function SelectValue({
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Value>) {
-  return <SelectPrimitive.Value data-slot="select-value" {...props} />
-}
-
-function SelectTrigger({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Trigger>) {
-  return (
-    <SelectPrimitive.Trigger
-      data-slot="select-trigger"
-      className={cn(
-        "border-input data-[placeholder]:text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex h-9 w-fit items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="size-4 opacity-50" />
-      </SelectPrimitive.Icon>
-    </SelectPrimitive.Trigger>
-  )
-}
-
-function SelectContent({
-  className,
-  children,
-  position = "popper",
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
-  return (
-    <SelectPrimitive.Portal>
-      <SelectPrimitive.Content
-        data-slot="select-content"
-        className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-md border shadow-md",
-          position === "popper" &&
-            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
-          className
-        )}
-        position={position}
-        {...props}
-      >
-        <SelectScrollUpButton />
-        <SelectPrimitive.Viewport
-          className={cn(
-            "p-1",
-            position === "popper" &&
-              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
-          )}
-        >
-          {children}
-        </SelectPrimitive.Viewport>
-        <SelectScrollDownButton />
-      </SelectPrimitive.Content>
-    </SelectPrimitive.Portal>
-  )
-}
-
-function SelectLabel({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Label>) {
-  return (
-    <SelectPrimitive.Label
-      data-slot="select-label"
-      className={cn("px-2 py-1.5 text-sm font-medium", className)}
-      {...props}
-    />
-  )
-}
-
-function SelectItem({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
-  return (
-    <SelectPrimitive.Item
-      data-slot="select-item"
-      className={cn(
-        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
-        className
-      )}
-      {...props}
-    >
-      <span className="absolute right-2 flex size-3.5 items-center justify-center">
-        <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
-        </SelectPrimitive.ItemIndicator>
-      </span>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-    </SelectPrimitive.Item>
-  )
-}
-
-function SelectSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Separator>) {
-  return (
-    <SelectPrimitive.Separator
-      data-slot="select-separator"
-      className={cn("bg-border pointer-events-none -mx-1 my-1 h-px", className)}
-      {...props}
-    />
-  )
-}
-
-function SelectScrollUpButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollUpButton>) {
-  return (
-    <SelectPrimitive.ScrollUpButton
-      data-slot="select-scroll-up-button"
-      className={cn(
-        "flex cursor-default items-center justify-center py-1",
-        className
-      )}
-      {...props}
-    >
-      <ChevronUpIcon className="size-4" />
-    </SelectPrimitive.ScrollUpButton>
-  )
-}
-
-function SelectScrollDownButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollDownButton>) {
-  return (
-    <SelectPrimitive.ScrollDownButton
-      data-slot="select-scroll-down-button"
-      className={cn(
-        "flex cursor-default items-center justify-center py-1",
-        className
-      )}
-      {...props}
-    >
-      <ChevronDownIcon className="size-4" />
-    </SelectPrimitive.ScrollDownButton>
-  )
-}
-
-export {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectScrollDownButton,
-  SelectScrollUpButton,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-}
-
-
----
-app/components/ui/separator.tsx
----
-"use client"
-
-import * as React from "react"
-import * as SeparatorPrimitive from "@radix-ui/react-separator"
-
-import { cn } from "@/lib/utils"
-
-function Separator({
-  className,
-  orientation = "horizontal",
-  decorative = true,
-  ...props
-}: React.ComponentProps<typeof SeparatorPrimitive.Root>) {
-  return (
-    <SeparatorPrimitive.Root
-      data-slot="separator-root"
-      decorative={decorative}
-      orientation={orientation}
-      className={cn(
-        "bg-border shrink-0 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-export { Separator }
-
-
----
-app/components/ui/tooltip.tsx
----
-"use client"
-
-import * as React from "react"
-import * as TooltipPrimitive from "@radix-ui/react-tooltip"
-
-import { cn } from "@/lib/utils"
-
-function TooltipProvider({
-  delayDuration = 0,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
-  return (
-    <TooltipPrimitive.Provider
-      data-slot="tooltip-provider"
-      delayDuration={delayDuration}
-      {...props}
-    />
-  )
-}
-
-function Tooltip({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return (
-    <TooltipProvider>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-    </TooltipProvider>
-  )
-}
-
-function TooltipTrigger({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
-}
-
-function TooltipContent({
-  className,
-  sideOffset = 0,
-  children,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
-  return (
-    <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Content
-        data-slot="tooltip-content"
-        sideOffset={sideOffset}
-        className={cn(
-          "bg-primary text-primary-foreground animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-fit rounded-md px-3 py-1.5 text-xs text-balance",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        <TooltipPrimitive.Arrow className="bg-primary fill-primary z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
-      </TooltipPrimitive.Content>
-    </TooltipPrimitive.Portal>
-  )
-}
-
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 
 
 ---
@@ -2667,7 +983,6 @@ export class BattleEngine {
 	private dex: ModdedDex;
 	private gens: Generations;
 	private format: string;
-	private battleState: BattleState;
 	private eventEmitter: BattleEventEmitter;
 	private p1: ManualPlayer;
 	private p2: ManualPlayer;
@@ -2689,31 +1004,6 @@ export class BattleEngine {
 
 		// Set up team generators
 		DTeams.setGeneratorFactory(TeamGenerators);
-
-		// Initialize battle state
-		this.battleState = {
-			format: this.format,
-			turn: 0,
-			p1: {
-				name: options.p1Name,
-				active: null,
-				team: [],
-				request: null,
-				selectedMove: null,
-			},
-			p2: {
-				name: options.p2Name,
-				active: null,
-				team: [],
-				request: null,
-				selectedMove: null,
-			},
-			weather: "none",
-			status: "Initializing battle...",
-			logs: [],
-			isComplete: false,
-			winner: null,
-		};
 
 		// Create battle streams
 		this.streams = BattleStreams.getPlayerStreams(
@@ -2747,7 +1037,7 @@ export class BattleEngine {
 		if (options.onBattleUpdate) {
 			this.on("stateUpdate", (state) => {
 				if (options.onBattleUpdate) {
-					options.onBattleUpdate(this.getState());
+					options.onBattleUpdate(state);
 				}
 			});
 		}
@@ -2842,11 +1132,11 @@ export class BattleEngine {
 		const p2TeamFinal = p2Team || createTeam();
 
 		const p1spec = {
-			name: this.p1.name,
+			name: this.p1.playerName,
 			team: p1TeamFinal ? DTeams.import(p1TeamFinal) : null,
 		};
 		const p2spec = {
-			name: this.p2.name,
+			name: this.p2.playerName,
 			team: p2TeamFinal ? DTeams.import(p2TeamFinal) : null,
 		};
 
@@ -2912,14 +1202,6 @@ export class BattleEngine {
 	 */
 	getAbility(abilityId: string) {
 		return this.dex.abilities.get(abilityId);
-	}
-
-	/**
-	 * Get the current battle state (immutable)
-	 * @returns A copy of the battle state
-	 */
-	getState(): Readonly<BattleState> {
-		return { ...this.battleState };
 	}
 
 	/**
@@ -3139,20 +1421,6 @@ export class BattleManager {
         }
         
         battle.processPlayerDecision(player, decision);
-    }
-
-    /**
-     * Get the current state of a battle
-     * @param battleId - The battle ID
-     * @returns The battle state
-     */
-    getBattleState(battleId: string): Readonly<BattleState> | undefined {
-        const battle = this.getBattle(battleId);
-        if (!battle) {
-            return undefined;
-        }
-        
-        return battle.getState();
     }
 } 
 
@@ -3434,56 +1702,6 @@ export class ManualPlayer {
         }
     }
 }
-
----
-app/store/battle-store.ts
----
-import { create } from 'zustand';
-import type { PokemonData } from '@/components/PokemonSelector';
-
-interface BattleState {
-  selectedPokemon: PokemonData | null;
-  selectedMoves: string[];
-  p1Team: string;
-  opponentPokemon: PokemonData | null;
-  opponentMoves: string[];
-  p2Team: string;
-  isLoading: boolean;
-  setSelectedPokemon: (pokemon: PokemonData | null) => void;
-  setSelectedMoves: (moves: string[]) => void;
-  setP1Team: (team: string) => void;
-  setOpponentPokemon: (pokemon: PokemonData | null) => void;
-  setOpponentMoves: (moves: string[]) => void;
-  setP2Team: (team: string) => void;
-  setIsLoading: (loading: boolean) => void;
-  reset: () => void;
-}
-
-export const useBattleStore = create<BattleState>((set) => ({
-  selectedPokemon: null,
-  selectedMoves: [],
-  p1Team: '',
-  opponentPokemon: null,
-  opponentMoves: [],
-  p2Team: '',
-  isLoading: false,
-  setSelectedPokemon: (pokemon) => set({ selectedPokemon: pokemon }),
-  setSelectedMoves: (moves) => set({ selectedMoves: moves }),
-  setP1Team: (team) => set({ p1Team: team }),
-  setP2Team: (team) => set({ p2Team: team }),
-  setOpponentPokemon: (pokemon) => set({ opponentPokemon: pokemon }),
-  setOpponentMoves: (moves) => set({ opponentMoves: moves }),
-  setIsLoading: (loading) => set({ isLoading: loading }),
-  reset: () => set({
-    selectedPokemon: null,
-    selectedMoves: [],
-    p1Team: '',
-    opponentPokemon: null,
-    opponentMoves: [],
-    p2Team: '',
-    isLoading: false
-  }),
-})); 
 
 ---
 app/store/settings.ts

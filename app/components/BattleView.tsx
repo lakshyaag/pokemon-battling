@@ -164,8 +164,8 @@ export default function BattleView({ battleId }: BattleViewProps) {
 						className="w-32 h-32 object-contain pixelated"
 					/>
 					{status && (
-						<Badge variant="secondary" className="absolute bottom-0 right-0">
-							{status}
+						<Badge className={`absolute bottom-0 right-0 ${getStatusClass(status)}`}>
+							{getStatusName(status)}
 						</Badge>
 					)}
 				</div>
@@ -274,24 +274,23 @@ export default function BattleView({ battleId }: BattleViewProps) {
 
 	// Render battle logs
 	const renderBattleLogs = () => {
-		if (!viewState?.battle) return <div>Loading battle logs...</div>;
+		if (!viewState?.logs) return null;
 
 		return (
-			<div className="h-full flex flex-col">
-				<h3 className="text-lg font-semibold mb-3">Battle Log</h3>
-				<pre className="text-sm font-medium bg-gray-100 border-gray-200 p-1 rounded">
-					Format: {(viewState.battle as any).format || "Unknown"} Turn:{" "}
-					{viewState.battle.turn}
-				</pre>
-				<div className="flex-1 overflow-y-auto mt-3 space-y-1 pr-2">
-					{viewState.logs.map((log) => (
+			<div className="h-48 overflow-y-auto p-4 bg-gray-50 rounded-lg">
+				{viewState.logs.map((log, index) => {
+					// Create a unique key using turn number and index
+					const key = `${viewState.battle.turn}-${index}`;
+					// Sanitize the HTML content (you should add a proper HTML sanitizer library)
+					return (
 						<div
-							key={log}
-							className="text-sm leading-relaxed protocol-line"
+							key={key}
+							className="mb-1 protocol-line"
+							// biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
 							dangerouslySetInnerHTML={{ __html: log }}
 						/>
-					))}
-				</div>
+					);
+				})}
 			</div>
 		);
 	};

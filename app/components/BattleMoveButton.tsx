@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { TYPE_COLORS } from "@/lib/constants";
 
 interface BattleMoveButtonProps {
 	moveId: string;
@@ -29,38 +30,7 @@ export default function BattleMoveButton({
 	disabledReason,
 	onClick,
 }: BattleMoveButtonProps) {
-	// Get color based on move type
-	const getTypeColor = (type: string) => {
-		const typeColors: Record<string, { bg: string; text: string }> = {
-			normal: { bg: "bg-gray-400", text: "text-white" },
-			fire: { bg: "bg-red-500", text: "text-white" },
-			water: { bg: "bg-blue-500", text: "text-white" },
-			electric: { bg: "bg-yellow-400", text: "text-black" },
-			grass: { bg: "bg-green-500", text: "text-white" },
-			ice: { bg: "bg-cyan-300", text: "text-black" },
-			fighting: { bg: "bg-red-700", text: "text-white" },
-			poison: { bg: "bg-purple-500", text: "text-white" },
-			ground: { bg: "bg-yellow-700", text: "text-white" },
-			flying: { bg: "bg-indigo-400", text: "text-white" },
-			psychic: { bg: "bg-pink-500", text: "text-white" },
-			bug: { bg: "bg-lime-500", text: "text-white" },
-			rock: { bg: "bg-yellow-800", text: "text-white" },
-			ghost: { bg: "bg-purple-700", text: "text-white" },
-			dragon: { bg: "bg-indigo-700", text: "text-white" },
-			dark: { bg: "bg-gray-700", text: "text-white" },
-			steel: { bg: "bg-gray-500", text: "text-white" },
-			fairy: { bg: "bg-pink-300", text: "text-black" },
-		};
-
-		return (
-			typeColors[type.toLowerCase()] || {
-				bg: "bg-gray-400",
-				text: "text-white",
-			}
-		);
-	};
-
-	const typeColor = getTypeColor(type);
+	const typeClass = TYPE_COLORS[type.toLowerCase() as keyof typeof TYPE_COLORS] || "bg-gray-400 text-white";
 
 	const button = (
 		<Button
@@ -73,10 +43,7 @@ export default function BattleMoveButton({
 		>
 			<div className="flex items-center justify-between w-full">
 				<span className="font-medium">{name}</span>
-				<Badge
-					variant="outline"
-					className={`${typeColor.bg} ${typeColor.text}`}
-				>
+				<Badge variant="outline" className={typeClass}>
 					{type}
 				</Badge>
 			</div>

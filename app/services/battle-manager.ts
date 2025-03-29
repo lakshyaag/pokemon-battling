@@ -95,18 +95,4 @@ export class BattleManager {
         
         battle.processPlayerDecision(player, decision);
     }
-
-    /**
-     * Get the current state of a battle
-     * @param battleId - The battle ID
-     * @returns The battle state
-     */
-    getBattleState(battleId: string): Readonly<BattleState> | undefined {
-        const battle = this.getBattle(battleId);
-        if (!battle) {
-            return undefined;
-        }
-        
-        return battle.getState();
-    }
 } 
