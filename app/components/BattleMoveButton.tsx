@@ -55,6 +55,10 @@ const moveButtonVariants = cva(
 					"bg-slate-100/50 hover:bg-slate-100 border-slate-200 dark:bg-slate-800/20 dark:hover:bg-slate-800/40 dark:border-slate-700",
 				fairy:
 					"bg-pink-100/50 hover:bg-pink-100 border-pink-200 dark:bg-pink-900/20 dark:hover:bg-pink-900/40 dark:border-pink-800/50",
+				stellar:
+					"bg-gray-100/50 hover:bg-gray-100 border-gray-200 dark:bg-gray-800/30 dark:hover:bg-gray-800/60 dark:border-gray-700",
+				"???":
+					"bg-gray-100/50 hover:bg-gray-100 border-gray-200 dark:bg-gray-800/30 dark:hover:bg-gray-800/60 dark:border-gray-700",
 				unknown:
 					"bg-gray-100/50 hover:bg-gray-100 border-gray-200 dark:bg-gray-800/30 dark:hover:bg-gray-800/60 dark:border-gray-700",
 			},
@@ -93,7 +97,8 @@ export default function BattleMoveButton({
 						}),
 						isButtonDisabled &&
 							"opacity-60 cursor-not-allowed hover:bg-inherit",
-						isSelected && "ring-2 ring-primary ring-offset-2 dark:ring-offset-background",
+						isSelected &&
+							"ring-2 ring-primary ring-offset-2 dark:ring-offset-background",
 						"text-left",
 					)}
 					disabled={isButtonDisabled}
