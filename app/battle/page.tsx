@@ -1,16 +1,76 @@
 "use client";
 
-import React from "react";
-import BattleComponent from "@/components/BattleView";
+import React, { useState, useEffect } from "react";
+import BattleView from "@/components/BattleView";
 import { useBattleStore } from "@/store/battle-store";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { battleManager } from "@/services/battle-manager-instance";
+import { useSettings } from "@/store/settings";
+import { getFormat } from "@/lib/constants";
 
 export default function BattlePage() {
-	const { p1Team, p2Team } = useBattleStore();
+	const { p1Team, p2Team, reset: resetBattleStore } = useBattleStore();
+	const { generation } = useSettings();
 	const router = useRouter();
+	const [battleId, setBattleId] = useState<string | null>(null);
 
-	// No redirect - we'll use random teams if none are provided
+	useEffect(() => {
+		// Only create a new battle if we don't have one
+		if (!battleId) {
+			const id = crypto.randomUUID();
+			const format = getFormat(generation);
+			const p1Name = "Player 1";
+			const p2Name = "Player 2";
+
+			try {
+				const battle = battleManager.createBattle(id, {
+					format,
+					p1Name,
+					p2Name,
+					p1Team: p1Team || undefined,
+					p2Team: p2Team || undefined,
+				});
+
+				// Subscribe to battle end to handle cleanup
+				battle.on("battleEnd", () => {
+					// Keep the battle around for a minute to allow for viewing results
+					setTimeout(() => {
+						battleManager.removeBattle(id);
+					}, 60000);
+				});
+
+				battleManager.startBattle(id);
+				setBattleId(id);
+			} catch (error) {
+				console.error("Error creating battle:", error);
+				router.push("/");
+			}
+		}
+
+		// Cleanup only when explicitly navigating away
+		return () => {
+			if (battleId) {
+				const battle = battleManager.getBattle(battleId);
+				if (battle && !battle.getState().isComplete) {
+					battleManager.removeBattle(battleId);
+				}
+			}
+			resetBattleStore();
+		};
+	}, [generation, p1Team, p2Team, router, resetBattleStore, battleId]);
+
+	const handleReturnHome = () => {
+		if (battleId) {
+			battleManager.removeBattle(battleId);
+		}
+		resetBattleStore();
+		router.push("/");
+	};
+
+	if (!battleId) {
+		return <div>Loading Battle...</div>;
+	}
 
 	return (
 		<div className="container mx-auto py-8">
@@ -19,19 +79,13 @@ export default function BattlePage() {
 				<div className="flex gap-4">
 					<Button
 						variant="outline"
-						onClick={() => router.push("/")}
+						onClick={handleReturnHome}
 					>
 						Return to Home
 					</Button>
 				</div>
 			</div>
-			<BattleComponent 
-				format="gen3randombattle"
-				p1Name="Player 1"
-				p2Name="Player 2"
-				p1Team={p1Team || undefined}
-				p2Team={p2Team || undefined}
-			/>
+			<BattleView battleId={battleId} />
 		</div>
 	);
 }

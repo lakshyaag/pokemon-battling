@@ -27,17 +27,18 @@ export interface BattleOptions {
  * Interface for player state in battle
  */
 export interface PlayerState {
-    name: string;
+    name?: string;
     active: Pokemon | null;
     team: Pokemon[];
     request: PlayerRequest | null;
-    selectedMove: number | null;
+    selectedMove: PlayerDecision | null;
 }
 
 /**
  * Interface for battle state
  */
 export interface BattleState {
+    format: string;
     turn: number;
     p1: PlayerState;
     p2: PlayerState;

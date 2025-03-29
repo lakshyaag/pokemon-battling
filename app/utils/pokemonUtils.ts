@@ -1,7 +1,6 @@
-import { Generations, type Specie } from "@pkmn/data";
+import { Generations, type Specie, type GenerationNum } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
 import type { PokemonData } from "../components/PokemonSelector";
-import { useSettings } from "@/app/store/settings";
 import { getGraphics } from "@/lib/constants";
 import type { Pokemon } from "@pkmn/client";
 import { Sprites } from "@pkmn/img";
@@ -12,10 +11,10 @@ export type PokemonWithMoves = {
 };
 
 /**
- * Generate a random Pokemon
+ * Generate a random Pokemon for a specific generation
+ * @param generation - The generation number
  */
-export async function getRandomPokemon(): Promise<PokemonWithMoves> {
-	const { generation } = useSettings.getState();
+export async function getRandomPokemon(generation: GenerationNum): Promise<PokemonWithMoves> {
 	const gens = new Generations(Dex);
 	const gen = gens.get(generation);
 
@@ -27,7 +26,7 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 	const randomPokemon = allPokemon[randomIndex];
 
 	// Get random moves for this Pokemon
-	const moves = await getRandomMovesForPokemon(randomPokemon);
+	const moves = await getRandomMovesForPokemon(randomPokemon, generation);
 
 	return {
 		// @ts-ignore
@@ -37,13 +36,15 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 }
 
 /**
- * Get random moves for a specific Pokemon
+ * Get random moves for a specific Pokemon in a specific generation
+ * @param pokemon - The Pokemon species
+ * @param generation - The generation number
  */
 export async function getRandomMovesForPokemon(
 	pokemon: Specie,
+	generation: GenerationNum
 ): Promise<string[]> {
 	try {
-		const { generation } = useSettings.getState();
 		const gens = new Generations(Dex);
 		const gen = gens.get(generation);
 
@@ -91,8 +92,13 @@ export async function getRandomMovesForPokemon(
 	}
 }
 
-export const getSprite = (pokemon: Pokemon, player: "p1" | "p2") => {
-	const { generation } = useSettings.getState();
+/**
+ * Get the sprite URL for a Pokemon
+ * @param pokemon - The Pokemon data
+ * @param player - The player side ("p1" or "p2")
+ * @param generation - The generation number
+ */
+export const getSprite = (pokemon: Pokemon, player: "p1" | "p2", generation: GenerationNum) => {
 	return Sprites.getPokemon(pokemon.speciesForme, {
 		side: player,
 		gender: pokemon.gender || undefined,

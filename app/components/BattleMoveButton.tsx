@@ -1,74 +1,195 @@
-import type { Move } from "@pkmn/data";
 import React from "react";
-import type { MoveData } from "../services/player";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import { TYPE_COLORS } from "@/lib/constants";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import type { Move } from "@pkmn/dex";
+import { cn } from "@/lib/utils";
+import { Separator } from "./ui/separator";
+import { Check } from "lucide-react";
 
-type BattleMoveButtonProps = {
-	moveDetails: MoveData;
-	moveData: Move;
-	isSelected: boolean;
-	onClick: () => void;
+export interface BattleMoveButtonProps {
+	move: Move;
 	disabled?: boolean;
-};
+	isDisabled?: boolean;
+	disabledReason?: string;
+	pp?: number;
+	maxPp?: number;
+	isSelected?: boolean;
+	onClick: () => void;
+}
 
 export default function BattleMoveButton({
-	moveDetails,
-	moveData,
+	move,
+	disabled,
+	isDisabled,
+	disabledReason,
+	pp,
+	maxPp,
 	isSelected,
 	onClick,
-	disabled = false,
 }: BattleMoveButtonProps) {
+	const isButtonDisabled =
+		disabled || isDisabled || (pp !== undefined && pp <= 0);
+	const tooltipContent = isDisabled
+		? disabledReason
+		: move.desc || move.shortDesc;
+
+	// Calculate PP status for styling
+	const ppPercentage = pp !== undefined && maxPp ? (pp / maxPp) * 100 : 100;
+	let ppColor = "text-emerald-500";
+	if (ppPercentage <= 50) ppColor = "text-yellow-500";
+	if (ppPercentage <= 25) ppColor = "text-red-500";
+	if (ppPercentage <= 0) ppColor = "text-gray-400";
+
+	// Format move priority for display
+	const getPriorityText = (priority: number) => {
+		if (priority > 0) return `+${priority} (Goes first)`;
+		if (priority < 0) return `${priority} (Goes last)`;
+		return "0 (Normal)";
+	};
+
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<button
-					type="button"
+				<Button
+					variant={isSelected ? "default" : "outline"}
+					className={cn(
+						"relative w-full h-full p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200",
+						isButtonDisabled && "opacity-50 cursor-not-allowed",
+						isSelected &&
+							!isButtonDisabled &&
+							"ring-2 ring-offset-2 ring-primary shadow-lg transform scale-[1.02]",
+						!isButtonDisabled &&
+							!isSelected &&
+							"hover:bg-accent/50 hover:scale-[1.01]",
+						TYPE_COLORS[move.type] &&
+							isSelected &&
+							`${TYPE_COLORS[move.type]} text-white`,
+					)}
 					onClick={onClick}
-					disabled={disabled}
-					className={`
-							w-full py-2 px-3 rounded text-sm capitalize border
-							${
-								isSelected
-									? "bg-green-500 text-white border-green-600"
-									: "bg-white hover:bg-gray-100 border-gray-300"
-							}
-							${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-						`}
+					disabled={isButtonDisabled}
 				>
-					{moveData.name.replace(/-/g, " ")}
-				</button>
+					{isSelected && !isButtonDisabled && (
+						<div className="absolute -top-2 -right-2 bg-primary text-white rounded-full p-1 shadow-md">
+							<Check size={12} />
+						</div>
+					)}
+					<div className="flex items-center justify-between w-full">
+						<span
+							className={cn(
+								"font-medium",
+								isSelected && !isButtonDisabled && "text-white font-semibold",
+							)}
+						>
+							{move.name}
+						</span>
+					</div>
+					<div className="flex items-center gap-2 flex-wrap justify-center">
+						<Badge
+							variant={isSelected ? "default" : "secondary"}
+							className={cn(
+								"text-xs px-2 py-0",
+								!isSelected && `${TYPE_COLORS[move.type]} text-white`,
+								isSelected && !isButtonDisabled && "bg-white/20 text-white",
+							)}
+						>
+							{move.type}
+						</Badge>
+						{isDisabled && (
+							<Badge variant="destructive" className="text-xs px-2 py-0">
+								Disabled
+							</Badge>
+						)}
+						{pp === 0 && (
+							<Badge variant="destructive" className="text-xs px-2 py-0">
+								No PP
+							</Badge>
+						)}
+					</div>
+				</Button>
 			</TooltipTrigger>
-			<TooltipContent className="p-3 max-w-xs">
-				<div className="space-y-2">
+			<TooltipContent
+				side="top"
+				className="w-80 p-4 bg-[#0F1729] border-[#1D283A] shadow-xl"
+			>
+				<div className="space-y-3">
+					{/* Move Header */}
 					<div className="flex items-center justify-between">
-						<span className="font-semibold">{moveData.name}</span>
-						<Badge className={`${TYPE_COLORS[moveData.type]} text-white`}>
-							{moveData.type}
+						<div className="flex items-center gap-2">
+							<span className="text-lg font-semibold text-white">
+								{move.name}
+							</span>
+							<Badge
+								variant="outline"
+								className={cn(
+									"text-xs border-0",
+									TYPE_COLORS[move.type],
+									"text-white",
+								)}
+							>
+								{move.type}
+							</Badge>
+						</div>
+						<Badge variant="outline" className="border-[#1D283A] text-white">
+							{move.category || "Special"}
 						</Badge>
 					</div>
-					<div className="grid grid-cols-3 gap-2 text-xs">
-						<div>
-							<span className="font-medium">Power:</span>{" "}
-							{moveData.basePower || "-"}
+
+					{/* Move Stats */}
+					<div className="grid grid-cols-3 gap-2 text-sm">
+						<div className="space-y-1">
+							<p className="text-[#64748B]">Power</p>
+							<p className="font-medium text-white">{move.basePower || "-"}</p>
 						</div>
-						<div>
-							<span className="font-medium">Acc:</span>{" "}
-							{moveData.accuracy === true ? "-" : moveData.accuracy}
+						<div className="space-y-1">
+							<p className="text-[#64748B]">Accuracy</p>
+							<p className="font-medium text-white">
+								{move.accuracy === true ? "Never Misses" : move.accuracy || "-"}
+							</p>
 						</div>
-						<div>
-							<span className="font-medium">PP:</span> {moveDetails.pp} /{" "}
-							{moveDetails.maxpp}
+						<div className="space-y-1">
+							<p className="text-[#64748B]">Priority</p>
+							<p className="font-medium text-white">
+								{getPriorityText(move.priority || 0)}
+							</p>
 						</div>
 					</div>
-					<div className="text-xs text-gray-600">
-						{moveData.shortDesc || moveData.desc || "No description available."}
+
+					<Separator className="bg-[#1D283A]" />
+
+					{/* Move Description */}
+					<div className="space-y-2">
+						<p className="text-sm leading-relaxed text-[#94A3B8]">
+							{isDisabled ? (
+								<span className="text-red-400 font-medium">
+									{disabledReason}
+								</span>
+							) : (
+								tooltipContent
+							)}
+						</p>
 					</div>
+
+					{/* PP Warning */}
+					{pp !== undefined && maxPp !== undefined && (
+						<div
+							className={cn(
+								"text-sm font-medium rounded-lg p-2",
+								pp <= 5
+									? "bg-red-950/50 text-red-400 border border-red-900/50"
+									: "bg-[#1D283A] text-[#94A3B8]",
+							)}
+						>
+							{pp <= 5 ? (
+								<span>⚠️ Warning: Low PP remaining!</span>
+							) : (
+								<span>
+									PP: {pp}/{maxPp} remaining
+								</span>
+							)}
+						</div>
+					)}
 				</div>
 			</TooltipContent>
 		</Tooltip>

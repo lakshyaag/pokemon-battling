@@ -60,7 +60,7 @@ export default function PokemonSelector() {
 				const gens = new Generations(Dex);
 				const gen = gens.get(generation);
 
-				// Get all Pokemon from Gen 1
+				// Get all Pokemon from the selected generation
 				const pokemonList = Array.from(gen.species).map((species) => {
 					// Get sprite URL using @pkmn/img
 					const spriteUrl = Sprites.getPokemon(species.name, {
@@ -94,7 +94,7 @@ export default function PokemonSelector() {
 				if (!pokemon) {
 					throw new Error(`Pokemon ${pokemonId} not found`);
 				}
-				const moves = await getRandomMovesForPokemon(pokemon);
+				const moves = await getRandomMovesForPokemon(pokemon, generation);
 
 				if (pokemon) {
 					setSelectedMoves(moves);
@@ -108,7 +108,7 @@ export default function PokemonSelector() {
 				setIsLoadingMoves(false);
 			}
 		},
-		[allPokemon, setSelectedMoves, setSelectedPokemon],
+		[allPokemon, setSelectedMoves, setSelectedPokemon, generation],
 	);
 
 	const handleSelectChange = useCallback(
@@ -138,7 +138,7 @@ export default function PokemonSelector() {
 				availablePokemon[Math.floor(Math.random() * availablePokemon.length)];
 
 			// Get moves for the opponent
-			const opponentMoves = await getRandomMovesForPokemon(randomOpponent);
+			const opponentMoves = await getRandomMovesForPokemon(randomOpponent, generation);
 
 			// Set opponent data
 			setOpponentPokemon(randomOpponent);
@@ -178,6 +178,7 @@ export default function PokemonSelector() {
 		setP1Team,
 		setP2Team,
 		router,
+		generation,
 	]);
 
 	if (isLoading) {
@@ -250,21 +251,16 @@ export default function PokemonSelector() {
 							disabledMoves={isLoadingMoves}
 						/>
 
-						<div className="flex gap-4">
+						<div className="flex justify-center mt-6">
 							<Button
 								onClick={handleStartBattle}
-								disabled={
-									isStartingBattle ||
-									!selectedPokemonId ||
-									!selectedMoves.length
-								}
-								variant="default"
-								className="flex-1"
+								disabled={!selectedPokemon || isStartingBattle}
+								className="w-full sm:w-auto"
 							>
 								{isStartingBattle ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										Starting battle...
+										Starting Battle...
 									</>
 								) : (
 									<>
