@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import type { BattleState, PlayerRequest, PlayerDecision } from "../services/battle-types";
+import type { BattleState, PlayerDecision } from "../services/battle-types";
 import type { Battle } from "@pkmn/client";
 import type { BattleEngine } from "../services/battle-engine";
 import { Badge } from "./ui/badge";
@@ -10,12 +10,6 @@ import { useSettings } from "@/store/settings";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import PlayerDisplay from "./PlayerDisplay";
-
-// Add this type to handle battle logs safely
-type BattleLog = {
-	id: string;
-	html: string;
-};
 
 interface BattleViewProps {
 	battleId: string;
@@ -83,6 +77,7 @@ export default function BattleView({ battleId }: BattleViewProps) {
 			const unsubscribeEnd = engine.on("battleEnd", ({ winner, state }) => {
 				if (mounted) {
 					console.log(`Battle ${battleId} ended. Winner: ${winner}`);
+
 					// Ensure the final state with winner/ended status is set
 					setViewState((prev) => ({
 						...(prev ?? {
@@ -109,7 +104,7 @@ export default function BattleView({ battleId }: BattleViewProps) {
 		};
 	}, [battleId, retryCount]);
 
-	// Effect for auto-scrolling logs
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Trigger scroll on log changes
 	useEffect(() => {
 		if (logScrollAreaRef.current) {
 			const scrollElement = logScrollAreaRef.current.querySelector(
@@ -119,7 +114,7 @@ export default function BattleView({ battleId }: BattleViewProps) {
 				scrollElement.scrollTop = scrollElement.scrollHeight;
 			}
 		}
-	}, [viewState?.logs]); // Trigger scroll on log changes
+	}, [viewState?.logs]);
 
 	// Handle player decisions (forward to engine)
 	const handlePlayerDecision = (
@@ -128,24 +123,65 @@ export default function BattleView({ battleId }: BattleViewProps) {
 	) => {
 		if (!battleEngineRef.current || viewState?.battle?.ended) return;
 
+		const otherPlayer = player === "p1" ? "p2" : "p1";
+		const currentDecision = decision;
+		const otherDecision = selectedDecisions[otherPlayer];
+
+		// Update the local state for visual feedback first
 		setSelectedDecisions((prev) => ({
 			...prev,
-			[player]: decision,
+			[player]: currentDecision,
 		}));
 
-		// Only execute the turn if both players have made their decisions
-		if (decision !== null && player === "p2" && selectedDecisions.p1 !== null) {
-			// Execute both decisions
-			battleEngineRef.current.processPlayerDecision("p1", selectedDecisions.p1);
-			battleEngineRef.current.processPlayerDecision("p2", decision);
-			// Reset selections
+		// Check if the other player has an active request needing a decision
+		const otherPlayerNeedsDecision =
+			otherPlayer === "p1"
+				? viewState?.p1Request && !viewState.p1Request.wait
+				: viewState?.p2Request && !viewState.p2Request.wait;
+
+		// Case 1: Current player made a decision, and the other player DOES NOT need to decide
+		if (currentDecision !== null && !otherPlayerNeedsDecision) {
+			console.log(`Sending immediate decision for ${player}:`, currentDecision);
+			battleEngineRef.current.processPlayerDecision(player, currentDecision);
+			// Clear this player's selection immediately after sending
+			setSelectedDecisions((prev) => ({ ...prev, [player]: null }));
+			// The other player's selection should already be null if they didn't need to decide
+			if (otherDecision !== null) {
+				console.warn(
+					`Cleared unexpected stored decision for ${otherPlayer} during immediate send.`,
+				);
+				setSelectedDecisions((prev) => ({ ...prev, [otherPlayer]: null }));
+			}
+		}
+		// Case 2: Current player made a decision, AND the other player ALSO needs to decide (and has already decided)
+		else if (
+			currentDecision !== null &&
+			otherPlayerNeedsDecision &&
+			otherDecision !== null
+		) {
+			console.log(
+				`Sending simultaneous decisions: P1=${
+					player === "p1" ? currentDecision : otherDecision
+				}, P2=${player === "p2" ? currentDecision : otherDecision}`,
+			);
+			// Send decisions (order might matter slightly depending on speed ties, but engine handles it)
+			if (player === "p1") {
+				battleEngineRef.current.processPlayerDecision("p1", currentDecision);
+				battleEngineRef.current.processPlayerDecision("p2", otherDecision);
+			} else {
+				battleEngineRef.current.processPlayerDecision("p1", otherDecision);
+				battleEngineRef.current.processPlayerDecision("p2", currentDecision);
+			}
+			// Reset selections after sending both
 			setSelectedDecisions({ p1: null, p2: null });
-		} else if (decision !== null && player === "p1" && selectedDecisions.p2 !== null) {
-			// Execute both decisions
-			battleEngineRef.current.processPlayerDecision("p1", decision);
-			battleEngineRef.current.processPlayerDecision("p2", selectedDecisions.p2);
-			// Reset selections
-			setSelectedDecisions({ p1: null, p2: null });
+		}
+		// Case 3: Current player made a decision, but the other player still needs to decide (and hasn't)
+		// Do nothing here, just wait for the other player's decision (which will trigger Case 2)
+
+		// Case 4: Player cancelled their decision (decision is null)
+		// The state is already updated via setSelectedDecisions above. No engine call needed.
+		else if (currentDecision === null) {
+			console.log(`Player ${player} cancelled selection.`);
 		}
 	};
 
@@ -225,8 +261,6 @@ export default function BattleView({ battleId }: BattleViewProps) {
 		winner?: string | null;
 		ended?: boolean;
 	};
-
-	console.log(battle);
 
 	return (
 		<div className="flex flex-col w-full max-w-7xl mx-auto space-y-4">

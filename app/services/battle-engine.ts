@@ -1,11 +1,6 @@
 import { Battle } from "@pkmn/client";
 import { Generations } from "@pkmn/data";
-import {
-	type ArgName,
-	type ArgType,
-	type BattleArgsKWArgType,
-	Protocol,
-} from "@pkmn/protocol";
+import { Protocol } from "@pkmn/protocol";
 import { TeamGenerators } from "@pkmn/randoms";
 import {
 	BattleStreams,
@@ -21,7 +16,6 @@ import {
 	type BattleEventMap,
 } from "./battle-event-emitter";
 import type {
-	BattleState,
 	BattleOptions,
 	PlayerDecision,
 	PlayerRequest,
@@ -113,7 +107,7 @@ export class BattleEngine {
 				for (const line of chunk.split("\n")) {
 					const { args, kwArgs } = Protocol.parseBattleLine(line);
 					const html = this.formatter.formatHTML(args, kwArgs);
-					
+
 					// Update battle state
 					this.battle.add(args, kwArgs);
 
@@ -130,12 +124,15 @@ export class BattleEngine {
 					battle: this.battle,
 					logs: [...this.logs],
 					p1Request: this.p1Request,
-					p2Request: this.p2Request
+					p2Request: this.p2Request,
 				});
 			}
 		} catch (error) {
 			console.error("Battle stream error:", error);
-			this.eventEmitter.emit("battleEnd", { winner: 'error', state: this.battle });
+			this.eventEmitter.emit("battleEnd", {
+				winner: "error",
+				state: this.battle,
+			});
 		}
 	}
 
@@ -159,7 +156,7 @@ export class BattleEngine {
 			battle: this.battle,
 			logs: [...this.logs],
 			p1Request: this.p1Request,
-			p2Request: this.p2Request
+			p2Request: this.p2Request,
 		});
 	}
 
@@ -218,15 +215,21 @@ export class BattleEngine {
 
 		if (decision.type === "move") {
 			choice = `move ${decision.moveIndex}`;
-			this.eventEmitter.emit("playerMove", { player, moveIndex: decision.moveIndex });
+			this.eventEmitter.emit("playerMove", {
+				player,
+				moveIndex: decision.moveIndex,
+			});
 		} else if (decision.type === "switch") {
 			choice = `switch ${decision.pokemonIndex}`;
-			this.eventEmitter.emit("playerSwitch", { player, pokemonIndex: decision.pokemonIndex });
+			this.eventEmitter.emit("playerSwitch", {
+				player,
+				pokemonIndex: decision.pokemonIndex,
+			});
 		}
 
 		if (choice) {
 			// Clear the corresponding request as the player has made a choice
-			if (player === 'p1') this.p1Request = null;
+			if (player === "p1") this.p1Request = null;
 			else this.p2Request = null;
 
 			// Write the choice to the player's stream
@@ -241,7 +244,7 @@ export class BattleEngine {
 				battle: this.battle,
 				logs: [...this.logs],
 				p1Request: this.p1Request,
-				p2Request: this.p2Request
+				p2Request: this.p2Request,
 			});
 		} else {
 			console.warn(`Invalid decision type received for ${player}:`, decision);

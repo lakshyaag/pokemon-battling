@@ -16,12 +16,14 @@ interface SwitchButtonProps {
 	pokemonInfo: PokemonInfo;
 	onClick: () => void;
 	disabled?: boolean;
+	isSelected?: boolean;
 }
 
 export default function SwitchButton({
 	pokemonInfo,
 	onClick,
 	disabled,
+	isSelected,
 }: SwitchButtonProps) {
 	const { generation } = useSettings();
 	const graphics = getGraphics(generation);
@@ -66,6 +68,8 @@ export default function SwitchButton({
 			className={cn(
 				"h-auto w-full p-3 flex items-center justify-start gap-3 text-left border rounded-lg shadow-sm hover:bg-accent/50 dark:hover:bg-accent/10",
 				disabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
+				isSelected &&
+					"ring-2 ring-primary ring-offset-2 dark:ring-offset-background",
 			)}
 			onClick={onClick}
 			disabled={disabled}
@@ -79,7 +83,9 @@ export default function SwitchButton({
 			<div className="flex-grow space-y-1">
 				<div className="flex justify-between items-center">
 					<span className="font-semibold text-sm">{name}</span>
-					{level && <span className="text-xs text-muted-foreground">Lv. {level}</span>}
+					{level && (
+						<span className="text-xs text-muted-foreground">Lv. {level}</span>
+					)}
 					{status && status !== "fnt" && (
 						<Badge
 							variant="secondary"

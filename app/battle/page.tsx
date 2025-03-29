@@ -66,19 +66,30 @@ export default function BattlePage() {
 		return <div>Loading Battle...</div>;
 	}
 
+	console.info("Battle ID:", battleId);
+	console.info("Battle Manager:", battleManager);
+
 	return (
 		<div className="container mx-auto py-8">
 			<div className="mb-6 flex justify-between items-center">
 				<h1 className="text-3xl font-bold">Pokémon Battle</h1>
 				<div className="flex gap-4">
+					{/* Add debug view that opens a modal with the battle state */}
 					<Button
 						variant="outline"
-						onClick={handleReturnHome}
+						onClick={() => {
+							const battle = battleManager.getBattle(battleId);
+							console.log("Battle State:", battle);
+						}}
 					>
+						Show Battle State
+					</Button>
+					<Button variant="outline" onClick={handleReturnHome}>
 						Return to Home
 					</Button>
 				</div>
 			</div>
+
 			<BattleView battleId={battleId} />
 		</div>
 	);

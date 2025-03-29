@@ -1,5 +1,5 @@
-import React from "react";
-import type { Pokemon, Battle } from "@pkmn/client";
+import { useState } from "react";
+import type { Battle } from "@pkmn/client";
 import type { PlayerRequest, PlayerDecision } from "@/services/battle-types";
 import type { BattleEngine } from "@/services/battle-engine";
 import type { GenerationNum } from "@pkmn/types";
@@ -141,55 +141,50 @@ export default function PlayerDisplay({
 		// Check if a switch is forced for the first active slot
 		const needsToSwitch = request?.forceSwitch?.[0] === true;
 		// Check if moves are available (request exists, not waiting, has moves)
-		const canMove = request && !request.wait && request.active?.[0]?.moves && request.active[0].moves.length > 0;
+		const canMove =
+			request &&
+			!request.wait &&
+			request.active?.[0]?.moves &&
+			request.active[0].moves.length > 0;
 		// Check if trapped
 		const isTrapped = request?.active?.[0]?.trapped === true;
 		// Check if can switch voluntarily
 		const canSwitch = !isTrapped && request?.active?.[0]?.canSwitch !== false;
 
 		const renderSwitchOptions = (showTitle = true) => {
-			if (!request) return null;
-			
-			const switchOptions = request.side.pokemon.filter(
-				(p) => !p.active && p.condition !== "0 fnt" && !p.reviving
+			const switchOptions = request?.side.pokemon.filter(
+				(p) => !p.active && p.condition !== "0 fnt",
 			);
 
-			if (switchOptions.length === 0) {
-				return (
-					<div className="text-center p-4 text-destructive">
-						No Pokémon available to switch in!
-					</div>
-				);
-			}
+			if (!switchOptions?.length) return null;
 
 			return (
 				<div className="space-y-2">
 					{showTitle && (
-						<h4 className="font-semibold text-center mb-2">
-							{needsToSwitch ? (
-								<span className="text-destructive">Must Switch!</span>
-							) : (
-								"Switch to"
-							)}
-						</h4>
+						<h3 className="text-sm font-medium text-muted-foreground">
+							Switch to:
+						</h3>
 					)}
 					{switchOptions.map((pokemonInfo) => {
-						// Find the original index in the full request.side.pokemon array
-						const originalIndex = request.side.pokemon.findIndex(
-							(p) => p.ident === pokemonInfo.ident
-						);
-						const switchIndex = originalIndex + 1; // 1-based index for protocol
+						const originalIndex =
+							request?.side.pokemon.findIndex(
+								(p) => p.ident === pokemonInfo.ident,
+							) ?? -1;
+
+						const switchIndex = originalIndex + 1;
 
 						if (originalIndex === -1) return null;
 
-						const isSelected = 
-							selectedDecision?.type === "switch" && 
+						// Check if this specific switch is the selected decision
+						const isSelected =
+							selectedDecision?.type === "switch" &&
 							selectedDecision.pokemonIndex === switchIndex;
 
 						return (
 							<SwitchButton
 								key={pokemonInfo.ident}
 								pokemonInfo={pokemonInfo}
+								isSelected={isSelected}
 								onClick={() => {
 									if (isSelected) {
 										onDecision(player, null);
@@ -215,11 +210,11 @@ export default function PlayerDisplay({
 
 		// Show moves and optional switch button
 		if (canMove) {
-			const moves = request!.active![0].moves;
+			const moves = request?.active?.[0]?.moves ?? [];
 			const isSelectedMove = selectedDecision?.type === "move";
 			const isSelectedSwitch = selectedDecision?.type === "switch";
-			const [showingSwitchOptions, setShowingSwitchOptions] = React.useState(false);
-			
+			const [showingSwitchOptions, setShowingSwitchOptions] = useState(false);
+
 			return (
 				<div className="space-y-3">
 					{!showingSwitchOptions ? (
@@ -240,10 +235,16 @@ export default function PlayerDisplay({
 											maxPp={moveInfo.maxpp}
 											disabled={isButtonDisabled || isSelectedSwitch}
 											isDisabled={isDisabled}
-											isSelected={isSelectedMove && selectedDecision.moveIndex === index + 1}
+											isSelected={
+												isSelectedMove &&
+												selectedDecision.moveIndex === index + 1
+											}
 											onClick={() => {
 												if (isButtonDisabled) return;
-												if (isSelectedMove && selectedDecision.moveIndex === index + 1) {
+												if (
+													isSelectedMove &&
+													selectedDecision.moveIndex === index + 1
+												) {
 													onDecision(player, null);
 												} else {
 													onDecision(player, {
