@@ -14,7 +14,9 @@ export type PokemonWithMoves = {
  * Generate a random Pokemon for a specific generation
  * @param generation - The generation number
  */
-export async function getRandomPokemon(generation: GenerationNum): Promise<PokemonWithMoves> {
+export async function getRandomPokemon(
+	generation: GenerationNum,
+): Promise<PokemonWithMoves> {
 	const gens = new Generations(Dex);
 	const gen = gens.get(generation);
 
@@ -42,7 +44,7 @@ export async function getRandomPokemon(generation: GenerationNum): Promise<Pokem
  */
 export async function getRandomMovesForPokemon(
 	pokemon: Specie,
-	generation: GenerationNum
+	generation: GenerationNum,
 ): Promise<string[]> {
 	try {
 		const gens = new Generations(Dex);
@@ -93,16 +95,47 @@ export async function getRandomMovesForPokemon(
 }
 
 /**
- * Get the sprite URL for a Pokemon
- * @param pokemon - The Pokemon data
- * @param player - The player side ("p1" or "p2")
- * @param generation - The generation number
+ * Get the sprite URL for a Pokémon
  */
-export const getSprite = (pokemon: Pokemon, player: "p1" | "p2", generation: GenerationNum) => {
-	return Sprites.getPokemon(pokemon.speciesForme, {
-		side: player,
-		gender: pokemon.gender || undefined,
-		gen: getGraphics(generation),
+export function getSprite(
+	pokemon: Pokemon,
+	player: "p1" | "p2",
+	generation: number = 3,
+): string {
+	// Get species name in the format expected by @pkmn/img
+	const species = pokemon.speciesForme.toLowerCase();
+
+	// Get sprite options
+	const options = {
+		gen: generation,
 		shiny: pokemon.shiny,
-	});
+		gender: pokemon.gender,
+		side: player,
+		mod: "ani", // Use animated sprites
+	};
+
+	// Get sprite URL using static method
+	return Sprites.getPokemon(species, options).url;
+}
+
+/**
+ * Parse HP and status from condition string
+ */
+export function parseCondition(pokemon?: Pokemon | null) {
+	if (!pokemon) return { currentHP: 0, maxHP: 0, status: "" };
+
+	const currentHP = pokemon.hp;
+	const maxHP = pokemon.maxhp;
+	const status = pokemon.status;
+
+	return { currentHP, maxHP, status };
+}
+
+/**
+ * Get HP bar color based on percentage
+ */
+export function getHPColor(percentage: number): string {
+	if (percentage > 50) return "bg-green-500";
+	if (percentage > 20) return "bg-yellow-500";
+	return "bg-red-500";
 }

@@ -1,4 +1,4 @@
-import type { Pokemon } from "@pkmn/client";
+import type { Pokemon, Battle } from "@pkmn/client";
 
 /**
  * Interface for move data
@@ -38,21 +38,55 @@ export interface PlayerState {
  * Interface for battle state
  */
 export interface BattleState {
-    format: string;
-    turn: number;
-    p1: PlayerState;
-    p2: PlayerState;
-    weather: string;
-    status: string;
+    battle: Battle;
     logs: string[];
-    isComplete: boolean;
-    winner: string | null;
+    p1Request: PlayerRequest | null;
+    p2Request: PlayerRequest | null;
 }
 
 /**
- * Interface for player move decision
+ * Interface for player request from the battle stream
  */
-export interface MoveDecision {
+export interface PlayerRequest {
+    active?: {
+        moves: Array<{
+            id: string;
+            pp: number;
+            maxpp: number;
+            target: string;
+            disabled?: boolean;
+        }>;
+    }[];
+    side: {
+        name: string;
+        id: string;
+        pokemon: Array<{
+            ident: string;
+            details: string;
+            condition: string;
+            active: boolean;
+            stats: {
+                atk: number;
+                def: number;
+                spa: number;
+                spd: number;
+                spe: number;
+            };
+            moves: string[];
+            baseAbility: string;
+            item: string;
+            pokeball: string;
+            ability: string;
+        }>;
+    };
+    rqid: number;
+    wait?: boolean;
+}
+
+/**
+ * Interface for player decisions
+ */
+export interface PlayerDecision {
     type: "move";
     moveIndex: number;
 }
@@ -63,20 +97,6 @@ export interface MoveDecision {
 export interface SwitchDecision {
     type: "switch";
     pokemonIndex: number;
-}
-
-/**
- * Interface for player request
- */
-export interface PlayerRequest {
-    active: {
-        moves: MoveData[];
-    }[];
-    side: {
-        id: string;
-        name: string;
-        pokemon: Pokemon[];
-    };
 }
 
 /**

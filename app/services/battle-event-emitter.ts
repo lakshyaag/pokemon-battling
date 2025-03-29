@@ -1,23 +1,22 @@
+import type { Battle } from "@pkmn/client";
 import type { BattleState, PlayerRequest } from "./battle-types";
 
 /**
  * Type-safe event map for battle events
  */
 export interface BattleEventMap {
-    stateUpdate: Readonly<BattleState>;
-    battleStart: Readonly<BattleState>;
-    battleEnd: { winner: string; state: Readonly<BattleState> };
-    turnStart: number;
-    turnComplete: number;
-    playerMove: { player: "p1" | "p2"; moveIndex: number };
+    stateUpdate: BattleState;
+    battleStart: Battle;
+    battleEnd: { winner: string | null; state: Battle };
     playerRequest: { player: "p1" | "p2"; request: PlayerRequest };
+    playerMove: { player: "p1" | "p2"; moveIndex: number };
 }
 
 /**
  * Simple event emitter for battle events
  */
 export class BattleEventEmitter {
-    private events: Record<string, Array<(data: unknown) => void>> = {};
+    private events: { [K in keyof BattleEventMap]?: Array<(data: BattleEventMap[K]) => void> } = {};
 
     /**
      * Register an event listener with type safety
@@ -29,22 +28,16 @@ export class BattleEventEmitter {
         event: K,
         listener: (data: BattleEventMap[K]) => void
     ): () => void {
-        // Type assertion here is necessary because we maintain type safety through the generic
-        return this.addListener(event, listener as (data: unknown) => void);
-    }
-
-    /**
-     * Internal method to add a listener
-     */
-    private addListener(event: string, listener: (data: unknown) => void): () => void {
         if (!this.events[event]) {
             this.events[event] = [];
         }
-        this.events[event].push(listener);
 
-        // Return unsubscribe function
+        this.events[event]?.push(listener);
+
         return () => {
-            this.events[event] = this.events[event].filter(l => l !== listener);
+            if (this.events[event]) {
+                this.events[event] = this.events[event]?.filter((l) => l !== listener);
+            }
         };
     }
 
@@ -56,9 +49,9 @@ export class BattleEventEmitter {
     emit<K extends keyof BattleEventMap>(event: K, data?: BattleEventMap[K]): void {
         if (!this.events[event]) return;
 
-        for (const listener of this.events[event]) {
+        for (const listener of this.events[event] || []) {
             try {
-                listener(data as unknown);
+                listener(data as BattleEventMap[K]);
             } catch (error) {
                 console.error(`Error in event listener for ${event}:`, error);
             }
@@ -69,7 +62,7 @@ export class BattleEventEmitter {
      * Remove all listeners for an event
      * @param event - The event name (optional, if not provided, removes all listeners)
      */
-    removeAllListeners(event?: string): void {
+    removeAllListeners(event?: keyof BattleEventMap): void {
         if (event) {
             this.events[event] = [];
         } else {

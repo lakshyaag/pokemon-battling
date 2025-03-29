@@ -299,17 +299,77 @@ app/battle/page.tsx
 ---
 "use client";
 
-import React from "react";
-import BattleComponent from "@/components/BattleView";
+import React, { useState, useEffect } from "react";
+import BattleView from "@/components/BattleView";
 import { useBattleStore } from "@/store/battle-store";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { battleManager } from "@/services/battle-manager-instance";
+import { useSettings } from "@/store/settings";
+import { getFormat } from "@/lib/constants";
 
 export default function BattlePage() {
-	const { p1Team, p2Team } = useBattleStore();
+	const { p1Team, p2Team, reset: resetBattleStore } = useBattleStore();
+	const { generation } = useSettings();
 	const router = useRouter();
+	const [battleId, setBattleId] = useState<string | null>(null);
 
-	// No redirect - we'll use random teams if none are provided
+	useEffect(() => {
+		// Only create a new battle if we don't have one
+		if (!battleId) {
+			const id = crypto.randomUUID();
+			const format = getFormat(generation);
+			const p1Name = "Player 1";
+			const p2Name = "Player 2";
+
+			try {
+				const battle = battleManager.createBattle(id, {
+					format,
+					p1Name,
+					p2Name,
+					p1Team: p1Team || undefined,
+					p2Team: p2Team || undefined,
+				});
+
+				// Subscribe to battle end to handle cleanup
+				battle.on("battleEnd", () => {
+					// Keep the battle around for a minute to allow for viewing results
+					setTimeout(() => {
+						battleManager.removeBattle(id);
+					}, 60000);
+				});
+
+				battleManager.startBattle(id);
+				setBattleId(id);
+			} catch (error) {
+				console.error("Error creating battle:", error);
+				router.push("/");
+			}
+		}
+
+		// Cleanup only when explicitly navigating away
+		return () => {
+			if (battleId) {
+				const battle = battleManager.getBattle(battleId);
+				if (battle && !battle.getState().isComplete) {
+					battleManager.removeBattle(battleId);
+				}
+			}
+			resetBattleStore();
+		};
+	}, [generation, p1Team, p2Team, router, resetBattleStore, battleId]);
+
+	const handleReturnHome = () => {
+		if (battleId) {
+			battleManager.removeBattle(battleId);
+		}
+		resetBattleStore();
+		router.push("/");
+	};
+
+	if (!battleId) {
+		return <div>Loading Battle...</div>;
+	}
 
 	return (
 		<div className="container mx-auto py-8">
@@ -318,19 +378,13 @@ export default function BattlePage() {
 				<div className="flex gap-4">
 					<Button
 						variant="outline"
-						onClick={() => router.push("/")}
+						onClick={handleReturnHome}
 					>
 						Return to Home
 					</Button>
 				</div>
 			</div>
-			<BattleComponent 
-				format="gen3randombattle"
-				p1Name="Player 1"
-				p2Name="Player 2"
-				p1Team={p1Team || undefined}
-				p2Team={p2Team || undefined}
-			/>
+			<BattleView battleId={battleId} />
 		</div>
 	);
 }
@@ -378,10 +432,9 @@ export default function SelectPokemonPage() {
 ---
 app/utils/pokemonUtils.ts
 ---
-import { Generations, type Specie } from "@pkmn/data";
+import { Generations, type Specie, type GenerationNum } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
 import type { PokemonData } from "../components/PokemonSelector";
-import { useSettings } from "@/app/store/settings";
 import { getGraphics } from "@/lib/constants";
 import type { Pokemon } from "@pkmn/client";
 import { Sprites } from "@pkmn/img";
@@ -392,10 +445,10 @@ export type PokemonWithMoves = {
 };
 
 /**
- * Generate a random Pokemon
+ * Generate a random Pokemon for a specific generation
+ * @param generation - The generation number
  */
-export async function getRandomPokemon(): Promise<PokemonWithMoves> {
-	const { generation } = useSettings.getState();
+export async function getRandomPokemon(generation: GenerationNum): Promise<PokemonWithMoves> {
 	const gens = new Generations(Dex);
 	const gen = gens.get(generation);
 
@@ -407,7 +460,7 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 	const randomPokemon = allPokemon[randomIndex];
 
 	// Get random moves for this Pokemon
-	const moves = await getRandomMovesForPokemon(randomPokemon);
+	const moves = await getRandomMovesForPokemon(randomPokemon, generation);
 
 	return {
 		// @ts-ignore
@@ -417,13 +470,15 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 }
 
 /**
- * Get random moves for a specific Pokemon
+ * Get random moves for a specific Pokemon in a specific generation
+ * @param pokemon - The Pokemon species
+ * @param generation - The generation number
  */
 export async function getRandomMovesForPokemon(
 	pokemon: Specie,
+	generation: GenerationNum
 ): Promise<string[]> {
 	try {
-		const { generation } = useSettings.getState();
 		const gens = new Generations(Dex);
 		const gen = gens.get(generation);
 
@@ -471,8 +526,13 @@ export async function getRandomMovesForPokemon(
 	}
 }
 
-export const getSprite = (pokemon: Pokemon, player: "p1" | "p2") => {
-	const { generation } = useSettings.getState();
+/**
+ * Get the sprite URL for a Pokemon
+ * @param pokemon - The Pokemon data
+ * @param player - The player side ("p1" or "p2")
+ * @param generation - The generation number
+ */
+export const getSprite = (pokemon: Pokemon, player: "p1" | "p2", generation: GenerationNum) => {
 	return Sprites.getPokemon(pokemon.speciesForme, {
 		side: player,
 		gender: pokemon.gender || undefined,
@@ -553,77 +613,198 @@ export default function BackgroundMusic() {
 ---
 app/components/BattleMoveButton.tsx
 ---
-import type { Move } from "@pkmn/data";
 import React from "react";
-import type { MoveData } from "../services/player";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import { TYPE_COLORS } from "@/lib/constants";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import type { Move } from "@pkmn/dex";
+import { cn } from "@/lib/utils";
+import { Separator } from "./ui/separator";
+import { Check } from "lucide-react";
 
-type BattleMoveButtonProps = {
-	moveDetails: MoveData;
-	moveData: Move;
-	isSelected: boolean;
-	onClick: () => void;
+export interface BattleMoveButtonProps {
+	move: Move;
 	disabled?: boolean;
-};
+	isDisabled?: boolean;
+	disabledReason?: string;
+	pp?: number;
+	maxPp?: number;
+	isSelected?: boolean;
+	onClick: () => void;
+}
 
 export default function BattleMoveButton({
-	moveDetails,
-	moveData,
+	move,
+	disabled,
+	isDisabled,
+	disabledReason,
+	pp,
+	maxPp,
 	isSelected,
 	onClick,
-	disabled = false,
 }: BattleMoveButtonProps) {
+	const isButtonDisabled =
+		disabled || isDisabled || (pp !== undefined && pp <= 0);
+	const tooltipContent = isDisabled
+		? disabledReason
+		: move.desc || move.shortDesc;
+
+	// Calculate PP status for styling
+	const ppPercentage = pp !== undefined && maxPp ? (pp / maxPp) * 100 : 100;
+	let ppColor = "text-emerald-500";
+	if (ppPercentage <= 50) ppColor = "text-yellow-500";
+	if (ppPercentage <= 25) ppColor = "text-red-500";
+	if (ppPercentage <= 0) ppColor = "text-gray-400";
+
+	// Format move priority for display
+	const getPriorityText = (priority: number) => {
+		if (priority > 0) return `+${priority} (Goes first)`;
+		if (priority < 0) return `${priority} (Goes last)`;
+		return "0 (Normal)";
+	};
+
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<button
-					type="button"
+				<Button
+					variant={isSelected ? "default" : "outline"}
+					className={cn(
+						"relative w-full h-full p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200",
+						isButtonDisabled && "opacity-50 cursor-not-allowed",
+						isSelected &&
+							!isButtonDisabled &&
+							"ring-2 ring-offset-2 ring-primary shadow-lg transform scale-[1.02]",
+						!isButtonDisabled &&
+							!isSelected &&
+							"hover:bg-accent/50 hover:scale-[1.01]",
+						TYPE_COLORS[move.type] &&
+							isSelected &&
+							`${TYPE_COLORS[move.type]} text-white`,
+					)}
 					onClick={onClick}
-					disabled={disabled}
-					className={`
-							w-full py-2 px-3 rounded text-sm capitalize border
-							${
-								isSelected
-									? "bg-green-500 text-white border-green-600"
-									: "bg-white hover:bg-gray-100 border-gray-300"
-							}
-							${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-						`}
+					disabled={isButtonDisabled}
 				>
-					{moveData.name.replace(/-/g, " ")}
-				</button>
+					{isSelected && !isButtonDisabled && (
+						<div className="absolute -top-2 -right-2 bg-primary text-white rounded-full p-1 shadow-md">
+							<Check size={12} />
+						</div>
+					)}
+					<div className="flex items-center justify-between w-full">
+						<span
+							className={cn(
+								"font-medium",
+								isSelected && !isButtonDisabled && "text-white font-semibold",
+							)}
+						>
+							{move.name}
+						</span>
+					</div>
+					<div className="flex items-center gap-2 flex-wrap justify-center">
+						<Badge
+							variant={isSelected ? "default" : "secondary"}
+							className={cn(
+								"text-xs px-2 py-0",
+								!isSelected && `${TYPE_COLORS[move.type]} text-white`,
+								isSelected && !isButtonDisabled && "bg-white/20 text-white",
+							)}
+						>
+							{move.type}
+						</Badge>
+						{isDisabled && (
+							<Badge variant="destructive" className="text-xs px-2 py-0">
+								Disabled
+							</Badge>
+						)}
+						{pp === 0 && (
+							<Badge variant="destructive" className="text-xs px-2 py-0">
+								No PP
+							</Badge>
+						)}
+					</div>
+				</Button>
 			</TooltipTrigger>
-			<TooltipContent className="p-3 max-w-xs">
-				<div className="space-y-2">
+			<TooltipContent
+				side="top"
+				className="w-80 p-4 bg-[#0F1729] border-[#1D283A] shadow-xl"
+			>
+				<div className="space-y-3">
+					{/* Move Header */}
 					<div className="flex items-center justify-between">
-						<span className="font-semibold">{moveData.name}</span>
-						<Badge className={`${TYPE_COLORS[moveData.type]} text-white`}>
-							{moveData.type}
+						<div className="flex items-center gap-2">
+							<span className="text-lg font-semibold text-white">
+								{move.name}
+							</span>
+							<Badge
+								variant="outline"
+								className={cn(
+									"text-xs border-0",
+									TYPE_COLORS[move.type],
+									"text-white",
+								)}
+							>
+								{move.type}
+							</Badge>
+						</div>
+						<Badge variant="outline" className="border-[#1D283A] text-white">
+							{move.category || "Special"}
 						</Badge>
 					</div>
-					<div className="grid grid-cols-3 gap-2 text-xs">
-						<div>
-							<span className="font-medium">Power:</span>{" "}
-							{moveData.basePower || "-"}
+
+					{/* Move Stats */}
+					<div className="grid grid-cols-3 gap-2 text-sm">
+						<div className="space-y-1">
+							<p className="text-[#64748B]">Power</p>
+							<p className="font-medium text-white">{move.basePower || "-"}</p>
 						</div>
-						<div>
-							<span className="font-medium">Acc:</span>{" "}
-							{moveData.accuracy === true ? "-" : moveData.accuracy}
+						<div className="space-y-1">
+							<p className="text-[#64748B]">Accuracy</p>
+							<p className="font-medium text-white">
+								{move.accuracy === true ? "Never Misses" : move.accuracy || "-"}
+							</p>
 						</div>
-						<div>
-							<span className="font-medium">PP:</span> {moveDetails.pp} /{" "}
-							{moveDetails.maxpp}
+						<div className="space-y-1">
+							<p className="text-[#64748B]">Priority</p>
+							<p className="font-medium text-white">
+								{getPriorityText(move.priority || 0)}
+							</p>
 						</div>
 					</div>
-					<div className="text-xs text-gray-600">
-						{moveData.shortDesc || moveData.desc || "No description available."}
+
+					<Separator className="bg-[#1D283A]" />
+
+					{/* Move Description */}
+					<div className="space-y-2">
+						<p className="text-sm leading-relaxed text-[#94A3B8]">
+							{isDisabled ? (
+								<span className="text-red-400 font-medium">
+									{disabledReason}
+								</span>
+							) : (
+								tooltipContent
+							)}
+						</p>
 					</div>
+
+					{/* PP Warning */}
+					{pp !== undefined && maxPp !== undefined && (
+						<div
+							className={cn(
+								"text-sm font-medium rounded-lg p-2",
+								pp <= 5
+									? "bg-red-950/50 text-red-400 border border-red-900/50"
+									: "bg-[#1D283A] text-[#94A3B8]",
+							)}
+						>
+							{pp <= 5 ? (
+								<span>⚠️ Warning: Low PP remaining!</span>
+							) : (
+								<span>
+									PP: {pp}/{maxPp} remaining
+								</span>
+							)}
+						</div>
+					)}
 				</div>
 			</TooltipContent>
 		</Tooltip>
@@ -639,111 +820,130 @@ app/components/BattleView.tsx
 import React, { useState, useEffect, useRef } from "react";
 import type { BattleState } from "../services/battle-types";
 import type { Pokemon } from "@pkmn/client";
-import { BattleEngine } from "../services/battle-engine";
+import type { BattleEngine } from "../services/battle-engine";
 import { TYPE_COLORS } from "@/lib/constants";
 import BattleMoveButton from "./BattleMoveButton";
 import { Badge } from "./ui/badge";
 import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { getSprite } from "../utils/pokemonUtils";
+import { battleManager } from "@/services/battle-manager-instance";
+import { useSettings } from "@/store/settings";
 
-interface BattleComponentProps {
-	format: string;
-	p1Name?: string;
-	p2Name?: string;
-	p1Team?: string;
-	p2Team?: string;
+// Add this type to handle battle logs safely
+type BattleLog = {
+	id: string;
+	html: string;
+};
+
+interface BattleViewProps {
+	battleId: string;
 }
 
 /**
  * Component for displaying and interacting with a Pokémon battle
  */
-export default function BattleComponent({
-	format,
-	p1Name = "Player 1",
-	p2Name = "Player 2",
-	p1Team,
-	p2Team,
-}: BattleComponentProps) {
+export default function BattleView({ battleId }: BattleViewProps) {
 	const battleEngineRef = useRef<BattleEngine | null>(null);
-	const [battleState, setBattleState] = useState<BattleState>({
-		turn: 0,
-		p1: {
-			name: p1Name,
-			active: null,
-			team: [],
-			request: null,
-			selectedMove: null,
-		},
-		p2: {
-			name: p2Name,
-			active: null,
-			team: [],
-			request: null,
-			selectedMove: null,
-		},
-		weather: "none",
-		status: "Initializing battle...",
-		logs: [],
-		isComplete: false,
-		winner: null,
-	});
-	const [isInitialized, setIsInitialized] = useState(false);
+	const { generation } = useSettings();
+	const [viewState, setViewState] = useState<BattleState | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [retryCount, setRetryCount] = useState(0);
+	const maxRetries = 3;
 
-	// Initialize battle engine
+	// Initialize battle engine and subscribe to updates
 	useEffect(() => {
-		if (!isInitialized) {
-			const battleEngine = new BattleEngine({
-				format,
-				p1Name,
-				p2Name,
-				p1Team,
-				p2Team,
-				onBattleUpdate: (state: BattleState) => {
-					setBattleState(state);
-				},
+		let retryTimeout: NodeJS.Timeout;
+		let mounted = true;
+
+		const initializeBattle = () => {
+			const engine = battleManager.getBattle(battleId);
+
+			if (!engine) {
+				if (retryCount < maxRetries) {
+					// Retry after a short delay
+					retryTimeout = setTimeout(() => {
+						if (mounted) {
+							setRetryCount((prev) => prev + 1);
+							initializeBattle();
+						}
+					}, 1000);
+					return;
+				}
+
+				setError(`Battle with ID ${battleId} not found or has ended.`);
+				setViewState(null);
+				return;
+			}
+
+			if (!mounted) return;
+
+			battleEngineRef.current = engine;
+			setViewState({
+				battle: engine.getBattle(),
+				logs: engine.getLogs(),
+				p1Request: engine.getP1Request(),
+				p2Request: engine.getP2Request()
 			});
+			setError(null);
+			setRetryCount(0);
 
 			// Subscribe to state updates
-			battleEngine.on("stateUpdate", (state) => {
-				setBattleState(state);
+			const unsubscribe = engine.on("stateUpdate", (state) => {
+				if (mounted) {
+					setViewState(state);
+				}
 			});
 
-			battleEngineRef.current = battleEngine;
-			setIsInitialized(true);
+			// Handle battle end
+			const unsubscribeEnd = engine.on("battleEnd", ({ winner, state }) => {
+				if (mounted) {
+					console.log(`Battle ${battleId} ended. Winner: ${winner}`);
+					setViewState(prev => prev ? {
+						...prev,
+						battle: state
+					} : null);
+				}
+			});
 
-			// Start the battle
-			battleEngine.startBattle(p1Team, p2Team);
-
-			// Cleanup function
+			// Cleanup: unsubscribe when component unmounts or battleId changes
 			return () => {
-				// Clean up any subscriptions or resources
+				unsubscribe();
+				unsubscribeEnd();
 			};
-		}
-	}, [format, p1Name, p2Name, p1Team, p2Team, isInitialized]);
+		};
+
+		const cleanup = initializeBattle();
+
+		return () => {
+			mounted = false;
+			if (retryTimeout) {
+				clearTimeout(retryTimeout);
+			}
+			if (cleanup) {
+				cleanup();
+			}
+		};
+	}, [battleId, retryCount]);
+
+	// Handle player decisions
+	const handlePlayerDecision = (player: "p1" | "p2", moveIndex: number) => {
+		if (!battleEngineRef.current) return;
+		battleEngineRef.current.processPlayerDecision(player, { type: "move", moveIndex });
+	};
 
 	// Handle move selection for player 1
 	const handleP1MoveSelect = (moveIndex: number) => {
-		if (!battleEngineRef.current) return;
-
-		battleEngineRef.current.processPlayerDecision("p1", {
-			type: "move",
-			moveIndex,
-		});
+		handlePlayerDecision("p1", moveIndex);
 	};
 
 	// Handle move selection for player 2
 	const handleP2MoveSelect = (moveIndex: number) => {
-		if (!battleEngineRef.current) return;
-
-		battleEngineRef.current.processPlayerDecision("p2", {
-			type: "move",
-			moveIndex,
-		});
+		handlePlayerDecision("p2", moveIndex);
 	};
 
 	// Parse HP and status from condition string
-	const parseCondition = (pokemon?: Pokemon) => {
+	const parseCondition = (pokemon?: Pokemon | null) => {
 		if (!pokemon) return { currentHP: 0, maxHP: 0, status: "" };
 
 		const currentHP = pokemon.hp;
@@ -755,16 +955,19 @@ export default function BattleComponent({
 
 	// Render player's Pokémon information
 	const renderPokemonInfo = (player: "p1" | "p2") => {
-		const pokemon = battleState[player].active;
-		const pokemonFromRequest = battleState[player].request?.side.pokemon[0];
+		if (!viewState?.battle) return <div>Loading battle state...</div>;
+
+		const pokemon = viewState.battle[player].active[0];
+		const request = player === "p1" ? viewState.p1Request : viewState.p2Request;
+		const pokemonFromRequest = request?.side.pokemon[0];
 
 		if (!pokemon) return <div>No active Pokémon</div>;
 
-		const sprite = getSprite(pokemon, player);
-		const item = pokemonFromRequest?.item
+		const sprite = getSprite(pokemon, player, generation);
+		const itemData = pokemonFromRequest?.item
 			? battleEngineRef.current?.getItem(pokemonFromRequest.item)
 			: null;
-		const ability = pokemonFromRequest?.baseAbility
+		const abilityData = pokemonFromRequest?.baseAbility
 			? battleEngineRef.current?.getAbility(pokemonFromRequest.baseAbility)
 			: null;
 
@@ -778,84 +981,51 @@ export default function BattleComponent({
 		if (hpPercentage <= 20) hpColor = "bg-red-500"; // Red
 
 		return (
-			<div className="mb-5">
-				<div className="flex items-center mb-3">
+			<div className="flex flex-col items-center space-y-4">
+				<div className="relative">
 					<img
-						src={sprite?.url}
+						src={sprite}
 						alt={pokemon.name}
-						className="w-24 h-24 mr-3"
+						className="w-32 h-32 object-contain"
 					/>
-					<div>
-						<h3 className="text-lg font-semibold">{pokemon.name}</h3>
-						{pokemon.types && (
-							<div className="flex gap-1 mt-1">
-								{pokemon.types.map((type) => (
-									<Badge
-										key={type}
-										variant="secondary"
-										className={`${TYPE_COLORS[type]} text-white text-xs px-2 py-0`}
-									>
-										{type}
-									</Badge>
-								))}
-							</div>
-						)}
-					</div>
-				</div>
-
-				<div className="mb-3">
-					<div className="flex justify-between mb-1">
-						<span className="font-medium">HP:</span>
-						<span className="font-medium">
-							{currentHP}/{maxHP} ({Math.round(hpPercentage)}%)
-						</span>
-					</div>
-					<div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-						<div
-							className={`h-full ${hpColor} transition-all duration-300`}
-							style={{ width: `${hpPercentage}%` }}
-						/>
-					</div>
-				</div>
-
-				<div className="flex flex-col gap-1 mb-1">
-					{item && (
-						<div className="flex justify-between">
-							<span className="font-medium">Item:</span>
-
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span className="font-medium">{item.name}</span>
-								</TooltipTrigger>
-								<TooltipContent>
-									<span>{item.desc}</span>
-								</TooltipContent>
-							</Tooltip>
-						</div>
-					)}
-					{ability && (
-						<div className="flex justify-between">
-							<span className="font-medium">Ability:</span>
-
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span className="font-medium">{ability.name}</span>
-								</TooltipTrigger>
-								<TooltipContent>
-									<span>{ability.desc}</span>
-								</TooltipContent>
-							</Tooltip>
-						</div>
-					)}
-				</div>
-
-				<div className="flex flex-wrap gap-2">
 					{status && (
-						<div
-							className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusClass(status)}`}
-						>
-							{getStatusName(status)}
+						<Badge variant="secondary" className="absolute bottom-0 right-0">
+							{status}
+						</Badge>
+					)}
+				</div>
+				<div className="text-center">
+					<h3 className="text-lg font-bold">{pokemon.name}</h3>
+					<div className="flex gap-2 justify-center">
+						{pokemon.types.map((type) => (
+							<Badge key={type} variant="outline">
+								{type}
+							</Badge>
+						))}
+					</div>
+					<div className="mt-2">
+						<div className="h-2 w-full bg-gray-200 rounded-full">
+							<div
+								className={`h-full ${hpColor} rounded-full`}
+								style={{
+									width: `${hpPercentage}%`,
+								}}
+							/>
 						</div>
+						<p className="text-sm mt-1">
+							{currentHP} / {maxHP} HP
+						</p>
+					</div>
+					{itemData && (
+						<p className="text-sm mt-1">
+							<span className="font-semibold">Item:</span> {itemData.name}
+						</p>
+					)}
+					{abilityData && (
+						<p className="text-sm">
+							<span className="font-semibold">Ability:</span>{" "}
+							{abilityData.name}
+						</p>
 					)}
 				</div>
 			</div>
@@ -864,63 +1034,66 @@ export default function BattleComponent({
 
 	// Render available moves for a player
 	const renderMoves = (player: "p1" | "p2") => {
-		const request = battleState[player].request;
-		if (!request || !request.active || !request.active[0]) {
-			return <div>No moves available</div>;
+		const request = player === "p1" ? viewState?.p1Request : viewState?.p2Request;
+
+		if (!request?.active?.[0]) {
+			if (viewState?.battle?.request?.wait) {
+				return <div className="text-gray-500 italic">Waiting for opponent...</div>;
+			}
+			return <div className="text-gray-500 italic">No move selection needed now.</div>;
 		}
 
-		const active = request.active[0];
-		const moves = active.moves || [];
-		const selectedMove = battleState[player].selectedMove;
+		const moves = request.active[0].moves || [];
 
 		return (
-			<div className="mt-5">
-				<h4 className="text-md font-semibold mb-3">Available Moves</h4>
-				<div className="grid grid-cols-2 gap-2">
-					{moves.map((move, index) => {
-						// Get move details if battleEngine is available
-						const moveData = battleEngineRef.current?.getMoveData(move.id);
-						if (!moveData) {
-							return null;
-						}
+			<div className="grid grid-cols-2 gap-3">
+				{moves.map((move, index) => {
+					const moveData = battleEngineRef.current?.getMoveData(move.id);
+					if (!moveData) return null;
 
-						return (
-							<BattleMoveButton
-								key={move.id}
-								moveDetails={move}
-								// @ts-ignore - The type error is due to a mismatch between @pkmn/sim and @pkmn/dex-types
-								moveData={moveData}
-								isSelected={selectedMove === index + 1}
-								onClick={() => {
-									if (player === "p1") {
-										handleP1MoveSelect(index + 1);
-									} else {
-										handleP2MoveSelect(index + 1);
-									}
-								}}
-								disabled={move.disabled}
-							/>
-						);
-					})}
-				</div>
+					const isDisabled = move.disabled;
+					const isButtonDisabled = !request || isDisabled || move.pp <= 0;
+
+					return (
+						<BattleMoveButton
+							key={move.id}
+							move={moveData}
+							disabled={isButtonDisabled}
+							isDisabled={isDisabled}
+							disabledReason={isDisabled ? "Move disabled by an effect" : undefined}
+							pp={move.pp}
+							maxPp={move.maxpp}
+							isSelected={false}
+							onClick={() => {
+								if (isButtonDisabled) return;
+								if (player === "p1") {
+									handleP1MoveSelect(index + 1);
+								} else {
+									handleP2MoveSelect(index + 1);
+								}
+							}}
+						/>
+					);
+				})}
 			</div>
 		);
 	};
 
 	// Render battle logs
 	const renderBattleLogs = () => {
+		if (!viewState?.battle) return <div>Loading battle logs...</div>;
+
 		return (
 			<div className="h-full flex flex-col">
 				<h3 className="text-lg font-semibold mb-3">Battle Log</h3>
-				<pre className="text-sm font-medium bg-green-100 border-green-200">
-					{format}
+				<pre className="text-sm font-medium bg-gray-100 border-gray-200 p-1 rounded">
+					Format: {viewState.battle.format} Turn: {viewState.battle.turn}
 				</pre>
-				<div className="flex-1 overflow-y-auto max-h-[400px] p-2.5 border border-gray-200 rounded bg-gray-50">
-					{battleState.logs.map((log: string, index: number) => (
+				<div className="flex-1 overflow-y-auto mt-3 space-y-1 pr-2">
+					{viewState.logs.map((log, index) => (
 						<div
-							key={`log-${index}-${Date.now()}`}
-							className="mb-1"
-							// biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
+							key={`${battleId}-log-${index}`}
+							className="text-sm leading-relaxed protocol-line"
 							dangerouslySetInnerHTML={{ __html: log }}
 						/>
 					))}
@@ -929,46 +1102,67 @@ export default function BattleComponent({
 		);
 	};
 
+	if (error) {
+		return (
+			<div className="text-red-500 text-center p-4">
+				{error}
+				{retryCount < maxRetries && (
+					<div className="mt-2">
+						Attempting to reconnect... (Attempt {retryCount + 1}/{maxRetries})
+					</div>
+				)}
+			</div>
+		);
+	}
+
+	if (!viewState?.battle) {
+		return <div className="text-center p-4">Loading battle state...</div>;
+	}
+
 	return (
-		<div className="flex flex-col w-full max-w-7xl mx-auto p-6 bg-gradient-to-b from-gray-50 to-gray-100 rounded-xl shadow-lg">
-			<div className="text-center mb-6">
-				<div className="flex justify-center items-center gap-4 mt-2">
-					<Badge
-						variant="outline"
-						className="px-4 py-1.5 text-sm font-medium transition-colors"
-					>
-						Turn: {battleState.turn}
+		<div className="flex flex-col w-full max-w-7xl mx-auto p-6 space-y-6">
+			{/* Battle Header */}
+			<div className="flex items-center justify-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
+				<div className="flex items-center gap-2">
+					<Badge variant="outline" className="text-lg px-4 py-2">
+						Turn: {viewState.battle.turn}
 					</Badge>
-					<Badge
-						variant="secondary"
-						className="px-4 py-1.5 text-sm font-medium"
-					>
-						{battleState.status}
+					<Badge variant="secondary" className="text-lg px-4 py-2">
+						Current Turn: {viewState.battle.currentTurn || viewState.battle.turn}
 					</Badge>
-					{battleState.weather !== "none" && (
-						<Badge
-							variant="outline"
-							className="px-4 py-1.5 text-sm font-medium bg-blue-100 border-blue-200"
-						>
-							{battleState.weather}
-						</Badge>
-					)}
 				</div>
+				{viewState.battle.weather !== "none" && (
+					<Badge variant="outline" className="text-lg px-4 py-2">
+						{viewState.battle.weather}
+					</Badge>
+				)}
+				{viewState.battle.winner && (
+					<Badge variant="destructive" className="text-lg px-4 py-2">
+						Winner: {viewState.battle.winner}
+					</Badge>
+				)}
+				{viewState.battle.ended && !viewState.battle.winner && (
+					<Badge variant="secondary" className="text-lg px-4 py-2">
+						Result: Tie
+					</Badge>
+				)}
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_1.2fr] gap-6">
-				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-					<h3 className="text-xl font-bold mb-4 text-indigo-800">{p1Name}</h3>
+			{/* Main Battle Grid */}
+			<div className="grid grid-cols-3 gap-6">
+				{/* Player 1 */}
+				<div className="col-span-1">
 					{renderPokemonInfo("p1")}
 					{renderMoves("p1")}
 				</div>
 
-				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+				{/* Battle Log */}
+				<div className="col-span-1">
 					{renderBattleLogs()}
 				</div>
 
-				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-					<h3 className="text-xl font-bold mb-4 text-indigo-800">{p2Name}</h3>
+				{/* Player 2 */}
+				<div className="col-span-1">
 					{renderPokemonInfo("p2")}
 					{renderMoves("p2")}
 				</div>
@@ -1299,7 +1493,7 @@ export default function PokemonSelector() {
 				const gens = new Generations(Dex);
 				const gen = gens.get(generation);
 
-				// Get all Pokemon from Gen 1
+				// Get all Pokemon from the selected generation
 				const pokemonList = Array.from(gen.species).map((species) => {
 					// Get sprite URL using @pkmn/img
 					const spriteUrl = Sprites.getPokemon(species.name, {
@@ -1333,7 +1527,7 @@ export default function PokemonSelector() {
 				if (!pokemon) {
 					throw new Error(`Pokemon ${pokemonId} not found`);
 				}
-				const moves = await getRandomMovesForPokemon(pokemon);
+				const moves = await getRandomMovesForPokemon(pokemon, generation);
 
 				if (pokemon) {
 					setSelectedMoves(moves);
@@ -1347,7 +1541,7 @@ export default function PokemonSelector() {
 				setIsLoadingMoves(false);
 			}
 		},
-		[allPokemon, setSelectedMoves, setSelectedPokemon],
+		[allPokemon, setSelectedMoves, setSelectedPokemon, generation],
 	);
 
 	const handleSelectChange = useCallback(
@@ -1377,7 +1571,7 @@ export default function PokemonSelector() {
 				availablePokemon[Math.floor(Math.random() * availablePokemon.length)];
 
 			// Get moves for the opponent
-			const opponentMoves = await getRandomMovesForPokemon(randomOpponent);
+			const opponentMoves = await getRandomMovesForPokemon(randomOpponent, generation);
 
 			// Set opponent data
 			setOpponentPokemon(randomOpponent);
@@ -1417,6 +1611,7 @@ export default function PokemonSelector() {
 		setP1Team,
 		setP2Team,
 		router,
+		generation,
 	]);
 
 	if (isLoading) {
@@ -1489,21 +1684,16 @@ export default function PokemonSelector() {
 							disabledMoves={isLoadingMoves}
 						/>
 
-						<div className="flex gap-4">
+						<div className="flex justify-center mt-6">
 							<Button
 								onClick={handleStartBattle}
-								disabled={
-									isStartingBattle ||
-									!selectedPokemonId ||
-									!selectedMoves.length
-								}
-								variant="default"
-								className="flex-1"
+								disabled={!selectedPokemon || isStartingBattle}
+								className="w-full sm:w-auto"
 							>
 								{isStartingBattle ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										Starting battle...
+										Starting Battle...
 									</>
 								) : (
 									<>
@@ -2333,6 +2523,39 @@ export {
 
 
 ---
+app/components/ui/separator.tsx
+---
+"use client"
+
+import * as React from "react"
+import * as SeparatorPrimitive from "@radix-ui/react-separator"
+
+import { cn } from "@/lib/utils"
+
+function Separator({
+  className,
+  orientation = "horizontal",
+  decorative = true,
+  ...props
+}: React.ComponentProps<typeof SeparatorPrimitive.Root>) {
+  return (
+    <SeparatorPrimitive.Root
+      data-slot="separator-root"
+      decorative={decorative}
+      orientation={orientation}
+      className={cn(
+        "bg-border shrink-0 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Separator }
+
+
+---
 app/components/ui/tooltip.tsx
 ---
 "use client"
@@ -2404,455 +2627,354 @@ app/services/battle-engine.ts
 import { Battle } from "@pkmn/client";
 import { Generations } from "@pkmn/data";
 import {
-    type ArgName,
-    type ArgType,
-    type BattleArgsKWArgType,
-    Protocol,
+	type ArgName,
+	type ArgType,
+	type BattleArgsKWArgType,
+	Protocol,
 } from "@pkmn/protocol";
 import { TeamGenerators } from "@pkmn/randoms";
 import {
-    BattleStreams,
-    Teams as DTeams,
-    Dex,
-    type ModdedDex,
-    PRNG,
+	BattleStreams,
+	Teams as DTeams,
+	Dex,
+	type ModdedDex,
+	PRNG,
 } from "@pkmn/sim";
 import type { ObjectReadWriteStream } from "@pkmn/streams";
 import { LogFormatter } from "@pkmn/view";
-import { BattleEventEmitter, type BattleEventMap } from "./battle-event-emitter";
-import type { BattleState, BattleOptions, PlayerDecision, PlayerRequest } from "./battle-types";
+import {
+	BattleEventEmitter,
+	type BattleEventMap,
+} from "./battle-event-emitter";
+import type {
+	BattleState,
+	BattleOptions,
+	PlayerDecision,
+	PlayerRequest,
+} from "./battle-types";
 import { ManualPlayer } from "./player";
 
 /**
  * Core battle engine that manages the battle state and logic
  */
 export class BattleEngine {
-    private battle: Battle;
-    private streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
-    private p1Stream: ObjectReadWriteStream<string>;
-    private p2Stream: ObjectReadWriteStream<string>;
-    private formatter: LogFormatter;
-    private prng: PRNG;
-    private dex: ModdedDex;
-    private gens: Generations;
-    private format: string;
-    private battleState: BattleState;
-    private eventEmitter: BattleEventEmitter;
-    private p1: ManualPlayer;
-    private p2: ManualPlayer;
+	private battle: Battle;
+	private streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
+	private p1Stream: ObjectReadWriteStream<string>;
+	private p2Stream: ObjectReadWriteStream<string>;
+	private formatter: LogFormatter;
+	private prng: PRNG;
+	private dex: ModdedDex;
+	private gens: Generations;
+	private format: string;
+	private battleState: BattleState;
+	private eventEmitter: BattleEventEmitter;
+	private p1: ManualPlayer;
+	private p2: ManualPlayer;
+	private logs: string[] = [];
+	private p1Request: PlayerRequest | null = null;
+	private p2Request: PlayerRequest | null = null;
 
-    /**
-     * Create a battle engine
-     * @param options - The battle options
-     */
-    constructor(options: BattleOptions) {
-        this.format = options.format || "gen3randombattle";
-        this.prng = new PRNG();
-        this.dex = Dex.forFormat(this.format);
-        // @ts-ignore
-        this.gens = new Generations(Dex);
-        this.eventEmitter = new BattleEventEmitter();
+	/**
+	 * Create a battle engine
+	 * @param options - The battle options
+	 */
+	constructor(options: BattleOptions) {
+		this.format = options.format || "gen3randombattle";
+		this.prng = new PRNG();
+		this.dex = Dex.forFormat(this.format);
+		// @ts-ignore
+		this.gens = new Generations(Dex);
+		this.eventEmitter = new BattleEventEmitter();
 
-        // Set up team generators
-        DTeams.setGeneratorFactory(TeamGenerators);
+		// Set up team generators
+		DTeams.setGeneratorFactory(TeamGenerators);
 
-        // Initialize battle state
-        this.battleState = {
-            turn: 0,
-            p1: {
-                name: options.p1Name,
-                active: null,
-                team: [],
-                request: null,
-                selectedMove: null
-            },
-            p2: {
-                name: options.p2Name,
-                active: null,
-                team: [],
-                request: null,
-                selectedMove: null
-            },
-            weather: "none",
-            status: "Initializing battle...",
-            logs: [],
-            isComplete: false,
-            winner: null
-        };
+		// Initialize battle state
+		this.battleState = {
+			format: this.format,
+			turn: 0,
+			p1: {
+				name: options.p1Name,
+				active: null,
+				team: [],
+				request: null,
+				selectedMove: null,
+			},
+			p2: {
+				name: options.p2Name,
+				active: null,
+				team: [],
+				request: null,
+				selectedMove: null,
+			},
+			weather: "none",
+			status: "Initializing battle...",
+			logs: [],
+			isComplete: false,
+			winner: null,
+		};
 
-        // Create battle streams
-        this.streams = BattleStreams.getPlayerStreams(
-            new BattleStreams.BattleStream(),
-        );
-        this.p1Stream = this.streams.p1;
-        this.p2Stream = this.streams.p2;
+		// Create battle streams
+		this.streams = BattleStreams.getPlayerStreams(
+			new BattleStreams.BattleStream(),
+		);
+		this.p1Stream = this.streams.p1;
+		this.p2Stream = this.streams.p2;
 
-        // Create battle instance
-        this.battle = new Battle(this.gens);
+		// Create battle instance
+		this.battle = new Battle(this.gens);
 
-        // Create formatter
-        this.formatter = new LogFormatter("p1", this.battle);
+		// Create formatter
+		this.formatter = new LogFormatter("p1", this.battle);
 
-        // Initialize players
-        this.p1 = new ManualPlayer(
-            this.p1Stream,
-            false,
-            options.p1Name,
-            (request: PlayerRequest) => this.handlePlayerRequest("p1", request)
-        );
+		// Initialize players
+		this.p1 = new ManualPlayer(
+			this.p1Stream,
+			false,
+			options.p1Name,
+			(request: PlayerRequest) => this.handlePlayerRequest("p1", request),
+		);
 
-        this.p2 = new ManualPlayer(
-            this.p2Stream,
-            false,
-            options.p2Name,
-            (request) => this.handlePlayerRequest("p2", request)
-        );
+		this.p2 = new ManualPlayer(
+			this.p2Stream,
+			false,
+			options.p2Name,
+			(request) => this.handlePlayerRequest("p2", request),
+		);
 
-        // Set up onBattleUpdate callback if provided
-        if (options.onBattleUpdate) {
-            this.on("stateUpdate", (state) => {
+		// Set up onBattleUpdate callback if provided
+		if (options.onBattleUpdate) {
+			this.on("stateUpdate", (state) => {
+				if (options.onBattleUpdate) {
+					options.onBattleUpdate(this.getState());
+				}
+			});
+		}
 
-                if (options.onBattleUpdate) {
-                    options.onBattleUpdate(this.getState());
-                }
-            });
-        }
+		// Start listening to the omniscient stream
+		this.startBattleStream();
+	}
 
-        // Start listening to the omniscient stream
-        this.startBattleStream();
-    }
+	/**
+	 * Start the battle stream
+	 */
+	private async startBattleStream(): Promise<void> {
+		try {
+			for await (const chunk of this.streams.omniscient) {
+				for (const line of chunk.split("\n")) {
+					const { args, kwArgs } = Protocol.parseBattleLine(line);
+					const html = this.formatter.formatHTML(args, kwArgs);
+					
+					// Update battle state
+					this.battle.add(args, kwArgs);
 
-    /**
-     * Start the battle stream
-     */
-    private async startBattleStream(): Promise<void> {
-        try {
-            for await (const chunk of this.streams.omniscient) {
-                for (const line of chunk.split("\n")) {
-                    const { args, kwArgs } = Protocol.parseBattleLine(line);
-                    const html = this.formatter.formatHTML(args, kwArgs);
-                    const key = Protocol.key(args);
+					if (html) {
+						this.logs.push(html);
+					}
+				}
 
-                    // Pre-processing
-                    this.preProcess(key, args, kwArgs);
+				// Update battle
+				this.battle.update();
 
-                    // Update battle state
-                    this.battle.add(args, kwArgs);
+				// Emit state update event
+				this.eventEmitter.emit("stateUpdate", {
+					battle: this.battle,
+					logs: [...this.logs],
+					p1Request: this.p1Request,
+					p2Request: this.p2Request
+				});
+			}
+		} catch (error) {
+			console.error("Battle stream error:", error);
+			this.eventEmitter.emit("battleEnd", { winner: 'error', state: this.battle });
+		}
+	}
 
-                    // Post-processing
-                    this.postProcess(key, args, kwArgs);
+	/**
+	 * Handle a player request
+	 * @param player - The player ID
+	 * @param request - The request
+	 */
+	private handlePlayerRequest(
+		player: "p1" | "p2",
+		request: PlayerRequest,
+	): void {
+		if (player === "p1") {
+			this.p1Request = request;
+		} else {
+			this.p2Request = request;
+		}
 
-                    if (html) {
-                        this.battleState.logs.push(html);
-                    }
-                }
+		this.eventEmitter.emit("playerRequest", { player, request });
+		this.eventEmitter.emit("stateUpdate", {
+			battle: this.battle,
+			logs: [...this.logs],
+			p1Request: this.p1Request,
+			p2Request: this.p2Request
+		});
+	}
 
-                // Update battle
-                this.battle.update();
+	/**
+	 * Start the battle
+	 * @param p1Team - Optional team for player 1
+	 * @param p2Team - Optional team for player 2
+	 */
+	startBattle(p1Team?: string, p2Team?: string): void {
+		const spec = { formatid: this.format };
 
-                // Emit state update event
-                this.eventEmitter.emit("stateUpdate", this.getState());
-            }
-        } catch (error) {
-            console.error("Battle stream error:", error);
-        }
-    }
+		// Generate random teams if needed
+		const createTeam = () => {
+			// Use the built-in team generator
+			try {
+				const generator = TeamGenerators.getTeamGenerator(
+					this.format,
+					this.prng,
+				);
+				return DTeams.export(generator.getTeam());
+			} catch (error) {
+				console.error("Error generating random team:", error);
+				return null;
+			}
+		};
 
-    /**
-     * Pre-process battle events
-     * @param key - The event key
-     * @param args - The event arguments
-     * @param kwArgs - The event keyword arguments
-     */
-    private preProcess(
-        key: ArgName | undefined,
-        args: ArgType,
-        kwArgs: BattleArgsKWArgType,
-    ): void {
-        if (key === "|faint|") {
-            const pokemonId = args[1] as string;
-            this.handleFaint(pokemonId);
-        }
-    }
+		const p1TeamFinal = p1Team || createTeam();
+		const p2TeamFinal = p2Team || createTeam();
 
-    /**
-     * Post-process battle events
-     * @param key - The event key
-     * @param args - The event arguments
-     * @param kwArgs - The event keyword arguments
-     */
-    private postProcess(
-        key: ArgName | undefined,
-        args: ArgType,
-        kwArgs: BattleArgsKWArgType,
-    ): void {
-        if (key === "|teampreview|") {
-            this.battleState.p1.team = [...this.battle.p1.team];
-            this.battleState.p2.team = [...this.battle.p2.team];
-            this.battleState.status = "Team preview";
-        } else if (key === "|turn|") {
-            this.battleState.turn = Number(args[1]);
-            this.battleState.status = `Current Turn: ${this.battleState.turn}`;
+		const p1spec = {
+			name: this.p1.name,
+			team: p1TeamFinal ? DTeams.import(p1TeamFinal) : null,
+		};
+		const p2spec = {
+			name: this.p2.name,
+			team: p2TeamFinal ? DTeams.import(p2TeamFinal) : null,
+		};
 
-            // Update active Pokémon
-            this.battleState.p1.active = this.battle.p1.active[0] || null;
-            this.battleState.p2.active = this.battle.p2.active[0] || null;
-
-            // Emit turn start event
-            this.eventEmitter.emit("turnStart", this.battleState.turn);
-        } else if (key === "|-weather|") {
-            const weather = args[1] as string;
-            this.battleState.weather = weather;
-
-            // Update status message based on weather
-            let weatherText = "";
-            switch (weather) {
-                case "RainDance":
-                    weatherText = "It's raining!";
-                    break;
-                case "Sandstorm":
-                    weatherText = "A sandstorm is raging!";
-                    break;
-                case "SunnyDay":
-                    weatherText = "The sunlight is strong!";
-                    break;
-                case "Hail":
-                    weatherText = "It's hailing!";
-                    break;
-                case "none":
-                    weatherText = "The weather cleared up!";
-                    break;
-                default:
-                    weatherText = `Weather: ${weather}`;
-            }
-            this.battleState.status = weatherText;
-        } else if (key === "|win|") {
-            const winner = args[1] as string;
-            this.battleState.isComplete = true;
-            this.battleState.winner = winner;
-            this.battleState.status = `${winner} has won the battle!`;
-
-            // Emit battle end event
-            this.eventEmitter.emit("battleEnd", {
-                winner,
-                state: this.getState()
-            });
-        }
-    }
-
-    /**
-     * Handle a fainted Pokémon
-     * @param pokemonId - The Pokémon ID
-     */
-    private handleFaint(pokemonId: string): void {
-        console.log(`${pokemonId} has fainted!`);
-
-        // Determine the winner if all Pokémon on one side have fainted
-        const isDead = (player: "p1" | "p2") =>
-            this.battle[player].team.every(p => p.fainted);
-
-        if (pokemonId.startsWith("p1") && isDead("p1")) {
-            this.battleState.winner = this.battleState.p2.name;
-            this.battleState.isComplete = true;
-            this.battleState.status = `${this.battleState.p2.name} has won the battle!`;
-
-            // Emit battle end event
-            this.eventEmitter.emit("battleEnd", {
-                winner: this.battleState.p2.name,
-                state: this.getState()
-            });
-        } else if (pokemonId.startsWith("p2") && isDead("p2")) {
-            this.battleState.winner = this.battleState.p1.name;
-            this.battleState.isComplete = true;
-            this.battleState.status = `${this.battleState.p1.name} has won the battle!`;
-
-            // Emit battle end event
-            this.eventEmitter.emit("battleEnd", {
-                winner: this.battleState.p1.name,
-                state: this.getState()
-            });
-        }
-    }
-
-    /**
-     * Handle a player request
-     * @param player - The player ID
-     * @param request - The request
-     */
-    private handlePlayerRequest(player: "p1" | "p2", request: PlayerRequest): void {
-        // Store the request in battle state
-        this.battleState[player].request = request;
-
-        // Update active Pokémon if available
-        // @ts-ignore
-        if (request.active && request.side && request.side.pokemon) {
-            const activePokemon = this.battle[player].active[0];
-            if (activePokemon) {
-                this.battleState[player].active = activePokemon;
-            }
-
-            // Update player teams
-            if (request.side.pokemon) {
-                this.battleState[player].team = request.side.pokemon;
-            }
-        }
-
-        // Emit player request event
-        this.eventEmitter.emit("playerRequest", { player, request });
-
-        // Emit state update event
-        this.eventEmitter.emit("stateUpdate", this.getState());
-    }
-
-    /**
-     * Start the battle
-     * @param p1Team - Optional team for player 1
-     * @param p2Team - Optional team for player 2
-     */
-    startBattle(p1Team?: string, p2Team?: string): void {
-        const spec = { formatid: this.format };
-
-        // Generate random teams if needed
-        const createTeam = () => {
-            // Use the built-in team generator
-            try {
-                const generator = TeamGenerators.getTeamGenerator(this.format, this.prng);
-                return DTeams.export(generator.getTeam());
-            } catch (error) {
-                console.error("Error generating random team:", error);
-                return null;
-            }
-        };
-
-        const p1TeamFinal = p1Team || createTeam();
-        const p2TeamFinal = p2Team || createTeam();
-
-        const p1spec = {
-            name: this.battleState.p1.name,
-            team: p1TeamFinal ? DTeams.import(p1TeamFinal) : null,
-        };
-        const p2spec = {
-            name: this.battleState.p2.name,
-            team: p2TeamFinal ? DTeams.import(p2TeamFinal) : null,
-        };
-
-        // Start the battle
-        void this.streams.omniscient.write(`>start ${JSON.stringify(spec)}
+		// Start the battle
+		void this.streams.omniscient.write(`>start ${JSON.stringify(spec)}
 >player p1 ${JSON.stringify(p1spec)}
 >player p2 ${JSON.stringify(p2spec)}`);
 
-        // Emit battle start event
-        this.eventEmitter.emit("battleStart", this.getState());
-    }
+		// Emit battle start event
+		this.eventEmitter.emit("battleStart", this.battle);
+	}
 
-    /**
-     * Process a player's move decision
-     * @param player - The player ID
-     * @param decision - The player's decision
-     */
-    processPlayerDecision(player: "p1" | "p2", decision: PlayerDecision): void {
-        if (decision.type === "move") {
-            const moveIndex = decision.moveIndex;
-            this.battleState[player].selectedMove = moveIndex;
+	/**
+	 * Process a player's move decision
+	 * @param player - The player ID
+	 * @param decision - The player's decision
+	 */
+	processPlayerDecision(player: "p1" | "p2", decision: PlayerDecision): void {
+		// Clear the request as the player has made a choice
+		if (player === 'p1') this.p1Request = null;
+		else this.p2Request = null;
 
-            // Make the move
-            if (player === "p1") {
-                void this.p1Stream.write(`move ${moveIndex}`);
-            } else {
-                void this.p2Stream.write(`move ${moveIndex}`);
-            }
+		if (decision.type === "move") {
+			const choice = `move ${decision.moveIndex}`;
+			if (player === "p1") {
+				void this.p1Stream.write(choice);
+			} else {
+				void this.p2Stream.write(choice);
+			}
+			this.eventEmitter.emit("playerMove", { player, moveIndex: decision.moveIndex });
+		}
 
-            // Emit move event
-            this.eventEmitter.emit("playerMove", {
-                player,
-                moveIndex
-            });
-        }
+		this.eventEmitter.emit("stateUpdate", {
+			battle: this.battle,
+			logs: [...this.logs],
+			p1Request: this.p1Request,
+			p2Request: this.p2Request
+		});
+	}
 
-        // Check if both players have made a move this turn
-        if (this.battleState.p1.selectedMove !== null &&
-            this.battleState.p2.selectedMove !== null) {
-            // Reset selected moves for next turn
-            this.battleState.p1.selectedMove = null;
-            this.battleState.p2.selectedMove = null;
+	/**
+	 * Get data for a move
+	 * @param moveId - The move ID
+	 * @returns The move data
+	 */
+	getMoveData(moveId: string) {
+		return this.dex.moves.get(moveId);
+	}
 
-            // Emit turn complete event
-            this.eventEmitter.emit("turnComplete", this.battleState.turn);
-        }
-    }
+	/**
+	 * Get data for an item
+	 * @param itemId - The item ID
+	 * @returns The item data
+	 */
+	getItem(itemId: string) {
+		return this.dex.items.get(itemId);
+	}
 
-    /**
-     * Get data for a move
-     * @param moveId - The move ID
-     * @returns The move data
-     */
-    getMoveData(moveId: string) {
-        return this.dex.moves.get(moveId);
-    }
+	/**
+	 * Get data for an ability
+	 * @param abilityId - The ability ID
+	 * @returns The ability data
+	 */
+	getAbility(abilityId: string) {
+		return this.dex.abilities.get(abilityId);
+	}
 
-    /**
-     * Get data for an item
-     * @param itemId - The item ID
-     * @returns The item data
-     */
-    getItem(itemId: string) {
-        return this.dex.items.get(itemId);
-    }
+	/**
+	 * Get the current battle state (immutable)
+	 * @returns A copy of the battle state
+	 */
+	getState(): Readonly<BattleState> {
+		return { ...this.battleState };
+	}
 
-    /**
-     * Get data for an ability
-     * @param abilityId - The ability ID
-     * @returns The ability data
-     */
-    getAbility(abilityId: string) {
-        return this.dex.abilities.get(abilityId);
-    }
+	/**
+	 * Subscribe to battle events with type safety
+	 * @param event - The event name
+	 * @param listener - The event listener function
+	 * @returns A function to unsubscribe
+	 */
+	on<K extends keyof BattleEventMap>(
+		event: K,
+		listener: (data: BattleEventMap[K]) => void,
+	): () => void {
+		return this.eventEmitter.on(event, listener);
+	}
 
-    /**
-     * Get the current battle state (immutable)
-     * @returns A copy of the battle state
-     */
-    getState(): Readonly<BattleState> {
-        return { ...this.battleState };
-    }
+	getBattle(): Readonly<Battle> {
+		return this.battle;
+	}
 
-    /**
-     * Subscribe to battle events with type safety
-     * @param event - The event name 
-     * @param listener - The event listener function
-     * @returns A function to unsubscribe
-     */
-    on<K extends keyof BattleEventMap>(
-        event: K,
-        listener: (data: BattleEventMap[K]) => void
-    ): () => void {
-        return this.eventEmitter.on(event, listener);
-    }
-} 
+	getLogs(): ReadonlyArray<string> {
+		return this.logs;
+	}
+
+	getP1Request(): Readonly<PlayerRequest> | null {
+		return this.p1Request;
+	}
+
+	getP2Request(): Readonly<PlayerRequest> | null {
+		return this.p2Request;
+	}
+}
+
 
 ---
 app/services/battle-event-emitter.ts
 ---
+import type { Battle } from "@pkmn/client";
 import type { BattleState, PlayerRequest } from "./battle-types";
 
 /**
  * Type-safe event map for battle events
  */
 export interface BattleEventMap {
-    stateUpdate: Readonly<BattleState>;
-    battleStart: Readonly<BattleState>;
-    battleEnd: { winner: string; state: Readonly<BattleState> };
-    turnStart: number;
-    turnComplete: number;
-    playerMove: { player: "p1" | "p2"; moveIndex: number };
+    stateUpdate: BattleState;
+    battleStart: Battle;
+    battleEnd: { winner: string | null; state: Battle };
     playerRequest: { player: "p1" | "p2"; request: PlayerRequest };
+    playerMove: { player: "p1" | "p2"; moveIndex: number };
 }
 
 /**
  * Simple event emitter for battle events
  */
 export class BattleEventEmitter {
-    private events: Record<string, Array<(data: unknown) => void>> = {};
+    private events: { [K in keyof BattleEventMap]?: Array<(data: BattleEventMap[K]) => void> } = {};
 
     /**
      * Register an event listener with type safety
@@ -2864,22 +2986,16 @@ export class BattleEventEmitter {
         event: K,
         listener: (data: BattleEventMap[K]) => void
     ): () => void {
-        // Type assertion here is necessary because we maintain type safety through the generic
-        return this.addListener(event, listener as (data: unknown) => void);
-    }
-
-    /**
-     * Internal method to add a listener
-     */
-    private addListener(event: string, listener: (data: unknown) => void): () => void {
         if (!this.events[event]) {
             this.events[event] = [];
         }
-        this.events[event].push(listener);
 
-        // Return unsubscribe function
+        this.events[event]?.push(listener);
+
         return () => {
-            this.events[event] = this.events[event].filter(l => l !== listener);
+            if (this.events[event]) {
+                this.events[event] = this.events[event]?.filter((l) => l !== listener);
+            }
         };
     }
 
@@ -2891,9 +3007,9 @@ export class BattleEventEmitter {
     emit<K extends keyof BattleEventMap>(event: K, data?: BattleEventMap[K]): void {
         if (!this.events[event]) return;
 
-        for (const listener of this.events[event]) {
+        for (const listener of this.events[event] || []) {
             try {
-                listener(data as unknown);
+                listener(data as BattleEventMap[K]);
             } catch (error) {
                 console.error(`Error in event listener for ${event}:`, error);
             }
@@ -2904,7 +3020,7 @@ export class BattleEventEmitter {
      * Remove all listeners for an event
      * @param event - The event name (optional, if not provided, removes all listeners)
      */
-    removeAllListeners(event?: string): void {
+    removeAllListeners(event?: keyof BattleEventMap): void {
         if (event) {
             this.events[event] = [];
         } else {
@@ -2912,6 +3028,17 @@ export class BattleEventEmitter {
         }
     }
 } 
+
+---
+app/services/battle-manager-instance.ts
+---
+import { BattleManager } from './battle-manager';
+
+/**
+ * Singleton instance of BattleManager for centralized battle management
+ * This ensures all components use the same instance for managing battles
+ */
+export const battleManager = new BattleManager(); 
 
 ---
 app/services/battle-manager.ts
@@ -3032,7 +3159,7 @@ export class BattleManager {
 ---
 app/services/battle-types.ts
 ---
-import type { Pokemon } from "@pkmn/client";
+import type { Pokemon, Battle } from "@pkmn/client";
 
 /**
  * Interface for move data
@@ -3061,31 +3188,66 @@ export interface BattleOptions {
  * Interface for player state in battle
  */
 export interface PlayerState {
-    name: string;
+    name?: string;
     active: Pokemon | null;
     team: Pokemon[];
     request: PlayerRequest | null;
-    selectedMove: number | null;
+    selectedMove: PlayerDecision | null;
 }
 
 /**
  * Interface for battle state
  */
 export interface BattleState {
-    turn: number;
-    p1: PlayerState;
-    p2: PlayerState;
-    weather: string;
-    status: string;
+    battle: Battle;
     logs: string[];
-    isComplete: boolean;
-    winner: string | null;
+    p1Request: PlayerRequest | null;
+    p2Request: PlayerRequest | null;
 }
 
 /**
- * Interface for player move decision
+ * Interface for player request from the battle stream
  */
-export interface MoveDecision {
+export interface PlayerRequest {
+    active?: {
+        moves: Array<{
+            id: string;
+            pp: number;
+            maxpp: number;
+            target: string;
+            disabled?: boolean;
+        }>;
+    }[];
+    side: {
+        name: string;
+        id: string;
+        pokemon: Array<{
+            ident: string;
+            details: string;
+            condition: string;
+            active: boolean;
+            stats: {
+                atk: number;
+                def: number;
+                spa: number;
+                spd: number;
+                spe: number;
+            };
+            moves: string[];
+            baseAbility: string;
+            item: string;
+            pokeball: string;
+            ability: string;
+        }>;
+    };
+    rqid: number;
+    wait?: boolean;
+}
+
+/**
+ * Interface for player decisions
+ */
+export interface PlayerDecision {
     type: "move";
     moveIndex: number;
 }
@@ -3096,20 +3258,6 @@ export interface MoveDecision {
 export interface SwitchDecision {
     type: "switch";
     pokemonIndex: number;
-}
-
-/**
- * Interface for player request
- */
-export interface PlayerRequest {
-    active: {
-        moves: MoveData[];
-    }[];
-    side: {
-        id: string;
-        name: string;
-        pokemon: Pokemon[];
-    };
 }
 
 /**
@@ -3148,479 +3296,6 @@ export interface PlayerRequestEvent {
     player: "p1" | "p2";
     request: PlayerRequest;
 } 
-
----
-app/services/battle.service.ts
----
-import { Battle, type Pokemon } from "@pkmn/client";
-import { Generations } from "@pkmn/data";
-import {
-    type ArgName,
-    type ArgType,
-    type BattleArgsKWArgType,
-    Protocol,
-} from "@pkmn/protocol";
-import { TeamGenerators } from "@pkmn/randoms";
-import {
-    BattleStreams,
-    Teams as DTeams,
-    Dex,
-    type ModdedDex,
-    PRNG,
-} from "@pkmn/sim";
-import type { ObjectReadWriteStream } from "@pkmn/streams";
-import { LogFormatter } from "@pkmn/view";
-import type { BattleRequest } from "./player";
-
-/**
- * Interface for battle options
- */
-interface BattleOptions {
-    format: string;
-    p1Name: string;
-    p2Name: string;
-    p1Team?: string;
-    p2Team?: string;
-    onBattleUpdate?: (state: BattleState) => void;
-}
-
-/**
- * Interface for battle state
- */
-interface BattleState {
-    turn: number;
-    p1: {
-        active: Pokemon | null;
-        team: Pokemon[];
-        request: BattleRequest | null;
-        selectedMove: number | null;
-    };
-    p2: {
-        active: Pokemon | null;
-        team: Pokemon[];
-        request: BattleRequest | null;
-        selectedMove: number | null;
-    };
-    weather: string;
-    status: string;
-    logs: string[];
-}
-
-/**
- * Class representing a manual player in a Pokémon battle
- */
-class ManualPlayer {
-    stream: ObjectReadWriteStream<string>;
-    log: string[] = [];
-    debug: boolean;
-    currentRequest: BattleRequest | null = null;
-    playerName: string;
-    onRequestReceived: (request: BattleRequest) => void;
-
-    /**
-     * Create a manual player
-     * @param playerStream - The player's stream
-     * @param debug - Whether to enable debug logging
-     * @param playerName - The player's name
-     * @param onRequestReceived - Callback for when a request is received
-     */
-    constructor(
-        playerStream: ObjectReadWriteStream<string>,
-        debug = false,
-        playerName = "Unknown",
-        onRequestReceived: (request: BattleRequest) => void = () => { },
-    ) {
-        this.stream = playerStream;
-        this.debug = debug;
-        this.playerName = playerName;
-        this.onRequestReceived = onRequestReceived;
-
-        void this.startListening();
-    }
-
-    /**
-     * Start listening to the stream
-     */
-    async startListening(): Promise<void> {
-        try {
-            for await (const chunk of this.stream) {
-                this.receive(chunk);
-            }
-        } catch (error) {
-            console.error(`${this.playerName} stream error:`, error);
-        }
-    }
-
-    /**
-     * Receive a chunk of data from the stream
-     * @param chunk - The data chunk
-     */
-    receive(chunk: string): void {
-        if (this.debug) console.log(`${this.playerName} received:`, chunk);
-
-        for (const line of chunk.split("\n")) {
-            this.receiveLine(line);
-        }
-    }
-
-    /**
-     * Receive a line of data
-     * @param line - The data line
-     */
-    receiveLine(line: string): void {
-        if (this.debug) console.log(`${this.playerName} line:`, line);
-        if (!line.startsWith("|")) return;
-
-        const [cmd, rest] =
-            line.slice(1).split("|", 1)[0] === ""
-                ? ["", line.slice(1)]
-                : [
-                    line.slice(1).split("|", 1)[0],
-                    line.slice(line.indexOf("|", 1) + 1),
-                ];
-
-        if (cmd === "request") {
-            try {
-                const request = JSON.parse(rest);
-                this.receiveRequest(request);
-            } catch (e) {
-                console.error(`${this.playerName} error parsing request:`, e, rest);
-            }
-            return;
-        }
-
-        if (cmd === "error") {
-            this.receiveError(new Error(rest));
-            return;
-        }
-
-        this.log.push(line);
-    }
-
-    /**
-     * Handle an error
-     * @param error - The error
-     */
-    receiveError(error: Error): void {
-        console.error(`${this.playerName} battle error:`, error);
-
-        // If we made an unavailable choice we will receive a followup request to
-        // allow us the opportunity to correct our decision.
-        if (error.message.startsWith("[Unavailable choice]")) return;
-    }
-
-    /**
-     * Handle a request
-     * @param request - The request
-     */
-    receiveRequest(request: BattleRequest): void {
-        this.currentRequest = request;
-        if (this.debug)
-            console.log(`${this.playerName} received request:`, request);
-        this.onRequestReceived(request);
-    }
-
-    /**
-     * Make a move
-     * @param moveIndex - The move index (1-based)
-     */
-    makeMove(moveIndex: number): void {
-        this.makeChoice(`move ${moveIndex}`);
-    }
-
-    /**
-     * Make a choice
-     * @param choice - The choice string
-     */
-    makeChoice(choice: string): void {
-        console.log(`${this.playerName} making choice: ${choice}`);
-        try {
-            void this.stream.write(choice);
-        } catch (error) {
-            console.error(`${this.playerName} error making choice:`, error);
-        }
-    }
-}
-
-/**
- * Class for handling Pokémon battles
- */
-export class BattleService {
-    private battle: Battle;
-    private streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
-    private p1: ManualPlayer;
-    private p2: ManualPlayer;
-    private formatter: LogFormatter;
-    private prng: PRNG;
-    private dex: ModdedDex;
-    private gens: Generations;
-    private format: string;
-    private battleState: BattleState;
-    private onBattleUpdate: (state: BattleState) => void;
-
-    /**
-     * Create a battle service
-     * @param options - The battle options
-     */
-    constructor(options: BattleOptions) {
-        this.format = options.format || "gen3randombattle";
-        this.prng = new PRNG();
-        this.dex = Dex.forFormat(this.format);
-        // @ts-ignore
-        this.gens = new Generations(Dex);
-        this.onBattleUpdate = options.onBattleUpdate || (() => { });
-
-        // Set up team generators
-        DTeams.setGeneratorFactory(TeamGenerators);
-
-        // Initialize battle state
-        this.battleState = {
-            turn: 0,
-            p1: { active: null, team: [], request: null, selectedMove: null },
-            p2: { active: null, team: [], request: null, selectedMove: null },
-            weather: "none",
-            status: "Initializing battle...",
-            logs: [],
-        };
-
-        // Create battle streams
-        this.streams = BattleStreams.getPlayerStreams(
-            new BattleStreams.BattleStream(),
-        );
-
-        // Create battle instance
-        this.battle = new Battle(this.gens);
-
-        // Create formatter
-        this.formatter = new LogFormatter("p1", this.battle);
-
-        // Create players
-        this.p1 = new ManualPlayer(
-            this.streams.p1,
-            true,
-            options.p1Name || "Player 1",
-            (request) => this.handlePlayerRequest("p1", request),
-        );
-
-        this.p2 = new ManualPlayer(
-            this.streams.p2,
-            true,
-            options.p2Name || "Player 2",
-            (request) => this.handlePlayerRequest("p2", request),
-        );
-
-        // Start listening to the omniscient stream
-        this.startBattleStream();
-    }
-
-    /**
-     * Start the battle stream
-     */
-    private async startBattleStream(): Promise<void> {
-        try {
-            for await (const chunk of this.streams.omniscient) {
-                for (const line of chunk.split("\n")) {
-                    const { args, kwArgs } = Protocol.parseBattleLine(line);
-                    const html = this.formatter.formatHTML(args, kwArgs);
-                    const key = Protocol.key(args);
-
-                    // Pre-processing
-                    this.preProcess(key, args, kwArgs);
-
-                    // Update battle state
-                    this.battle.add(args, kwArgs);
-
-                    // Post-processing
-                    this.postProcess(key, args, kwArgs);
-
-                    if (html) {
-                        this.battleState.logs.push(html);
-                    }
-                }
-
-                // Update battle
-                this.battle.update();
-
-                // Notify listeners
-                this.onBattleUpdate({ ...this.battleState });
-            }
-        } catch (error) {
-            console.error("Battle stream error:", error);
-        }
-    }
-
-    /**
-     * Pre-process battle events
-     * @param key - The event key
-     * @param args - The event arguments
-     * @param kwArgs - The event keyword arguments
-     */
-    private preProcess(
-        key: ArgName | undefined,
-        args: ArgType,
-        kwArgs: BattleArgsKWArgType,
-    ): void {
-        if (key === "|faint|") {
-            const pokemonId = args[1] as string;
-            this.handleFaint(pokemonId);
-        }
-    }
-
-    /**
-     * Post-process battle events
-     * @param key - The event key
-     * @param args - The event arguments
-     * @param kwArgs - The event keyword arguments
-     */
-    private postProcess(
-        key: ArgName | undefined,
-        args: ArgType,
-        kwArgs: BattleArgsKWArgType,
-    ): void {
-        if (key === "|teampreview|") {
-            this.battleState.p1.team = [...this.battle.p1.team];
-            this.battleState.p2.team = [...this.battle.p2.team];
-            this.battleState.status = "Team preview";
-        } else if (key === "|turn|") {
-            this.battleState.turn = Number(args[1]);
-            this.battleState.status = `Current Turn: ${this.battleState.turn}`;
-
-            // Update active Pokémon
-            this.battleState.p1.active = this.battle.p1.active[0] || null;
-            this.battleState.p2.active = this.battle.p2.active[0] || null;
-        } else if (key === "|-weather|") {
-            const weather = args[1] as string;
-            this.battleState.weather = weather;
-
-            // Update status message based on weather
-            let weatherText = "";
-            switch (weather) {
-                case "RainDance":
-                    weatherText = "It's raining!";
-                    break;
-                case "Sandstorm":
-                    weatherText = "A sandstorm is raging!";
-                    break;
-                case "SunnyDay":
-                    weatherText = "The sunlight is strong!";
-                    break;
-                case "Hail":
-                    weatherText = "It's hailing!";
-                    break;
-                case "none":
-                    weatherText = "The weather cleared up!";
-                    break;
-                default:
-                    weatherText = `Weather: ${weather}`;
-            }
-            this.battleState.status = weatherText;
-        }
-    }
-
-    /**
-     * Handle a fainted Pokémon
-     * @param pokemonId - The Pokémon ID
-     */
-    private handleFaint(pokemonId: string): void {
-        console.log(`${pokemonId} has fainted!`);
-
-        // Determine the winner
-        const winner = pokemonId.startsWith("p1") ? "p2" : "p1";
-        const winnerName =
-            winner === "p1" ? this.p1.playerName : this.p2.playerName;
-
-        // Update battle status
-        this.battleState.status = `${winnerName} has won the battle!`;
-    }
-
-    /**
-     * Handle a player request
-     * @param player - The player ID
-     * @param request - The request
-     */
-    private handlePlayerRequest(
-        player: "p1" | "p2",
-        request: BattleRequest,
-    ): void {
-        // Store the request in battle state
-        this.battleState[player].request = request;
-
-        // Update active Pokémon if available
-        if (request.active && request.side && request.side.pokemon) {
-            const activePokemon = this.battle[player].active[0];
-            if (activePokemon) {
-                this.battleState[player].active = activePokemon;
-            }
-        }
-
-        // Notify listeners
-        this.onBattleUpdate({ ...this.battleState });
-    }
-
-    /**
-     * Start the battle
-     * @param p1Team - Optional team for player 1
-     * @param p2Team - Optional team for player 2
-     */
-    startBattle(p1Team?: string, p2Team?: string): void {
-        const spec = { formatid: this.format };
-        const p1spec = {
-            name: this.p1.playerName,
-            team: p1Team ? DTeams.import(p1Team) : null,
-        };
-        const p2spec = {
-            name: this.p2.playerName,
-            team: p2Team ? DTeams.import(p2Team) : null,
-        };
-
-        // Start the battle
-        void this.streams.omniscient.write(`>start ${JSON.stringify(spec)}
->player p1 ${JSON.stringify(p1spec)}
->player p2 ${JSON.stringify(p2spec)}`);
-    }
-
-    /**
-     * Make a move for player 1
-     * @param moveIndex - The move index (1-based)
-     */
-    makeP1Move(moveIndex: number): void {
-        this.p1.makeMove(moveIndex);
-    }
-
-    /**
-     * Make a move for player 2
-     * @param moveIndex - The move index (1-based)
-     */
-    makeP2Move(moveIndex: number): void {
-        this.p2.makeMove(moveIndex);
-    }
-
-    /**
-     * Get the current battle state
-     * @returns The battle state
-     */
-    getBattleState(): BattleState {
-        return { ...this.battleState };
-    }
-
-    /**
-     * Get move data for a Pokémon
-     * @param moveId - The move ID
-     * @returns The move data
-     */
-    getMoveData(moveId: string) {
-        return this.dex.moves.get(moveId);
-    }
-
-    getItem(itemId: string) {
-        return this.dex.items.get(itemId);
-    }
-
-    getAbility(abilityId: string) {
-        return this.dex.abilities.get(abilityId);
-    }
-}
-
 
 ---
 app/services/player.ts

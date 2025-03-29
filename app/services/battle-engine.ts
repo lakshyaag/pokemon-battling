@@ -45,6 +45,9 @@ export class BattleEngine {
 	private eventEmitter: BattleEventEmitter;
 	private p1: ManualPlayer;
 	private p2: ManualPlayer;
+	private logs: string[] = [];
+	private p1Request: PlayerRequest | null = null;
+	private p2Request: PlayerRequest | null = null;
 
 	/**
 	 * Create a battle engine
@@ -136,19 +139,12 @@ export class BattleEngine {
 				for (const line of chunk.split("\n")) {
 					const { args, kwArgs } = Protocol.parseBattleLine(line);
 					const html = this.formatter.formatHTML(args, kwArgs);
-					const key = Protocol.key(args);
-
-					// Pre-processing
-					this.preProcess(key, args, kwArgs);
-
+					
 					// Update battle state
 					this.battle.add(args, kwArgs);
 
-					// Post-processing
-					this.postProcess(key, args, kwArgs);
-
 					if (html) {
-						this.battleState.logs.push(html);
+						this.logs.push(html);
 					}
 				}
 
@@ -156,126 +152,16 @@ export class BattleEngine {
 				this.battle.update();
 
 				// Emit state update event
-				this.eventEmitter.emit("stateUpdate", this.getState());
+				this.eventEmitter.emit("stateUpdate", {
+					battle: this.battle,
+					logs: [...this.logs],
+					p1Request: this.p1Request,
+					p2Request: this.p2Request
+				});
 			}
 		} catch (error) {
 			console.error("Battle stream error:", error);
-		}
-	}
-
-	/**
-	 * Pre-process battle events
-	 * @param key - The event key
-	 * @param args - The event arguments
-	 * @param kwArgs - The event keyword arguments
-	 */
-	private preProcess(
-		key: ArgName | undefined,
-		args: ArgType,
-		kwArgs: BattleArgsKWArgType,
-	): void {
-		if (key === "|faint|") {
-			const pokemonId = args[1] as string;
-			this.handleFaint(pokemonId);
-		}
-	}
-
-	/**
-	 * Post-process battle events
-	 * @param key - The event key
-	 * @param args - The event arguments
-	 * @param kwArgs - The event keyword arguments
-	 */
-	private postProcess(
-		key: ArgName | undefined,
-		args: ArgType,
-		kwArgs: BattleArgsKWArgType,
-	): void {
-		if (key === "|teampreview|") {
-			this.battleState.p1.team = [...this.battle.p1.team];
-			this.battleState.p2.team = [...this.battle.p2.team];
-			this.battleState.status = "Team preview";
-		} else if (key === "|turn|") {
-			this.battleState.turn = Number(args[1]);
-			this.battleState.status = `Current Turn: ${this.battleState.turn}`;
-
-			// Update active Pokémon
-			this.battleState.p1.active = this.battle.p1.active[0] || null;
-			this.battleState.p2.active = this.battle.p2.active[0] || null;
-
-			// Emit turn start event
-			this.eventEmitter.emit("turnStart", this.battleState.turn);
-		} else if (key === "|-weather|") {
-			const weather = args[1] as string;
-			this.battleState.weather = weather;
-
-			// Update status message based on weather
-			let weatherText = "";
-			switch (weather) {
-				case "RainDance":
-					weatherText = "It's raining!";
-					break;
-				case "Sandstorm":
-					weatherText = "A sandstorm is raging!";
-					break;
-				case "SunnyDay":
-					weatherText = "The sunlight is strong!";
-					break;
-				case "Hail":
-					weatherText = "It's hailing!";
-					break;
-				case "none":
-					weatherText = "The weather cleared up!";
-					break;
-				default:
-					weatherText = `Weather: ${weather}`;
-			}
-			this.battleState.status = weatherText;
-		} else if (key === "|win|") {
-			const winner = args[1] as string;
-			this.battleState.isComplete = true;
-			this.battleState.winner = winner;
-			this.battleState.status = `${winner} has won the battle!`;
-
-			// Emit battle end event
-			this.eventEmitter.emit("battleEnd", {
-				winner,
-				state: this.getState(),
-			});
-		}
-	}
-
-	/**
-	 * Handle a fainted Pokémon
-	 * @param pokemonId - The Pokémon ID
-	 */
-	private handleFaint(pokemonId: string): void {
-		console.log(`${pokemonId} has fainted!`);
-
-		// Determine the winner if all Pokémon on one side have fainted
-		const isDead = (player: "p1" | "p2") =>
-			this.battle[player].team.every((p) => p.fainted);
-
-		if (pokemonId.startsWith("p1") && isDead("p1")) {
-			this.battleState.winner = this.battleState.p2.name;
-			this.battleState.isComplete = true;
-			this.battleState.status = `${this.battleState.p2.name} has won the battle!`;
-
-			// Emit battle end event
-			this.eventEmitter.emit("battleEnd", {
-				winner: this.battleState.p2.name,
-				state: this.getState(),
-			});
-		} else if (pokemonId.startsWith("p2") && isDead("p2")) {
-			this.battleState.winner = this.battleState.p1.name;
-			this.battleState.isComplete = true;
-			this.battleState.status = `${this.battleState.p1.name} has won the battle!`;
-
-			// Emit battle end event
-			this.eventEmitter.emit("battleEnd", {
-				winner: this.battleState.p1.name,
-				state: this.getState(),
-			});
+			this.eventEmitter.emit("battleEnd", { winner: 'error', state: this.battle });
 		}
 	}
 
@@ -288,28 +174,19 @@ export class BattleEngine {
 		player: "p1" | "p2",
 		request: PlayerRequest,
 	): void {
-		// Store the request in battle state
-		this.battleState[player].request = request;
-
-		// Update active Pokémon if available
-		// @ts-ignore
-		if (request.active && request.side && request.side.pokemon) {
-			const activePokemon = this.battle[player].active[0];
-			if (activePokemon) {
-				this.battleState[player].active = activePokemon;
-			}
-
-			// Update player teams
-			if (request.side.pokemon) {
-				this.battleState[player].team = request.side.pokemon;
-			}
+		if (player === "p1") {
+			this.p1Request = request;
+		} else {
+			this.p2Request = request;
 		}
 
-		// Emit player request event
 		this.eventEmitter.emit("playerRequest", { player, request });
-
-		// Emit state update event
-		this.eventEmitter.emit("stateUpdate", this.getState());
+		this.eventEmitter.emit("stateUpdate", {
+			battle: this.battle,
+			logs: [...this.logs],
+			p1Request: this.p1Request,
+			p2Request: this.p2Request
+		});
 	}
 
 	/**
@@ -339,11 +216,11 @@ export class BattleEngine {
 		const p2TeamFinal = p2Team || createTeam();
 
 		const p1spec = {
-			name: this.battleState.p1.name,
+			name: this.p1.name,
 			team: p1TeamFinal ? DTeams.import(p1TeamFinal) : null,
 		};
 		const p2spec = {
-			name: this.battleState.p2.name,
+			name: this.p2.name,
 			team: p2TeamFinal ? DTeams.import(p2TeamFinal) : null,
 		};
 
@@ -353,7 +230,7 @@ export class BattleEngine {
 >player p2 ${JSON.stringify(p2spec)}`);
 
 		// Emit battle start event
-		this.eventEmitter.emit("battleStart", this.getState());
+		this.eventEmitter.emit("battleStart", this.battle);
 	}
 
 	/**
@@ -362,36 +239,26 @@ export class BattleEngine {
 	 * @param decision - The player's decision
 	 */
 	processPlayerDecision(player: "p1" | "p2", decision: PlayerDecision): void {
+		// Clear the request as the player has made a choice
+		if (player === 'p1') this.p1Request = null;
+		else this.p2Request = null;
+
 		if (decision.type === "move") {
-			const moveIndex = decision.moveIndex;
-			this.battleState[player].selectedMove = decision;
-
-			// Make the move
+			const choice = `move ${decision.moveIndex}`;
 			if (player === "p1") {
-				void this.p1Stream.write(`move ${moveIndex}`);
+				void this.p1Stream.write(choice);
 			} else {
-				void this.p2Stream.write(`move ${moveIndex}`);
+				void this.p2Stream.write(choice);
 			}
-
-			// Emit move event
-			this.eventEmitter.emit("playerMove", {
-				player,
-				moveIndex,
-			});
+			this.eventEmitter.emit("playerMove", { player, moveIndex: decision.moveIndex });
 		}
 
-		// Check if both players have made a move this turn
-		if (
-			this.battleState.p1.selectedMove !== null &&
-			this.battleState.p2.selectedMove !== null
-		) {
-			// Reset selected moves for next turn
-			this.battleState.p1.selectedMove = null;
-			this.battleState.p2.selectedMove = null;
-
-			// Emit turn complete event
-			this.eventEmitter.emit("turnComplete", this.battleState.turn);
-		}
+		this.eventEmitter.emit("stateUpdate", {
+			battle: this.battle,
+			logs: [...this.logs],
+			p1Request: this.p1Request,
+			p2Request: this.p2Request
+		});
 	}
 
 	/**
@@ -440,5 +307,21 @@ export class BattleEngine {
 		listener: (data: BattleEventMap[K]) => void,
 	): () => void {
 		return this.eventEmitter.on(event, listener);
+	}
+
+	getBattle(): Readonly<Battle> {
+		return this.battle;
+	}
+
+	getLogs(): ReadonlyArray<string> {
+		return this.logs;
+	}
+
+	getP1Request(): Readonly<PlayerRequest> | null {
+		return this.p1Request;
+	}
+
+	getP2Request(): Readonly<PlayerRequest> | null {
+		return this.p2Request;
 	}
 }
