@@ -274,6 +274,7 @@ export default function Home() {
 		setIsCreatingBattle(true);
 		console.log("Requesting random battle creation...");
 		const format = getFormat(generation);
+		console.log("Format:", format);
 		emit("client:create_battle", { format, userId });
 
 		if (createTimeoutRef.current) clearTimeout(createTimeoutRef.current);
@@ -432,7 +433,11 @@ import { Button } from "@/components/ui/button";
 import { useRouter, useParams } from "next/navigation";
 import { useSocketStore } from "@/store/socket";
 import { useSettings } from "@/store/settings";
-import type { PlayerDecision, PlayerRequest } from "@/services/battle-types";
+import type {
+	PlayerDecision,
+	PlayerId,
+	PlayerRequest,
+} from "@/lib/battle-types";
 import { Card, CardContent } from "@/components/ui/card";
 
 // Import @pkmn/client and related packages
@@ -491,21 +496,21 @@ export default function BattlePage() {
 		(lines: string[]) => {
 			if (!battleRef.current || !formatterRef.current) return;
 
-			const currentLogs = [];
+			const currentLogs: string[] = [];
 			let latestRequest: PlayerRequest | null = null;
 
 			for (const line of lines) {
 				if (!line) continue;
 				try {
 					const { args, kwArgs } = Protocol.parseBattleLine(line);
-					// Add to client battle state
-					battleRef.current.add(args, kwArgs);
-
 					// Format log line
 					const html = formatterRef.current.formatHTML(args, kwArgs);
 					if (html) {
 						currentLogs.push(html);
 					}
+
+					// Add to client battle state
+					battleRef.current.add(args, kwArgs);
 
 					// Check if this line is a request for *this* player
 					if (args[0] === "request" && playerRole) {
@@ -571,7 +576,7 @@ export default function BattlePage() {
 
 		const handleBattleJoined = (data: {
 			battleId: string;
-			playerRole: "p1" | "p2";
+			playerRole: PlayerId;
 			opponentUserId?: string;
 		}) => {
 			if (data.battleId === battleId) {
@@ -1041,7 +1046,7 @@ app/components/BattleView.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import type { PlayerDecision, PlayerRequest } from "@/services/battle-types";
+import type { PlayerDecision, PlayerRequest } from "@/lib/battle-types";
 import type { Battle } from "@pkmn/client";
 import { Badge } from "./ui/badge";
 import { useSettings } from "@/store/settings";
@@ -1077,6 +1082,8 @@ export default function BattleView({
 		useState<PlayerDecision | null>(null);
 
 	// Scroll logs to bottom when they update
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		if (logScrollAreaRef.current) {
 			const scrollElement = logScrollAreaRef.current.querySelector(
@@ -1095,6 +1102,7 @@ export default function BattleView({
 	};
 
 	// Reset local selection when a new request comes in or turn changes
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		setSelectedDecision(null);
 	}, [playerRequest, clientBattle?.turn]);
@@ -1211,17 +1219,21 @@ app/components/PlayerDisplay.tsx
 ---
 import { useState, useEffect } from "react";
 import type { Battle } from "@pkmn/client";
-import type { PlayerRequest, PlayerDecision } from "@/services/battle-types";
+import type { PlayerRequest, PlayerDecision } from "@/lib/battle-types";
 import type { GenerationNum } from "@pkmn/types";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { TypeBadge } from "./ui/type-badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { TypeBadge } from "@/components/ui/type-badge";
 import BattleMoveButton from "./BattleMoveButton";
 import SwitchButton from "./SwitchButton";
 import { getSprite, parseCondition, getHPColor } from "@/utils/pokemonUtils";
 import { getStatusClass, getStatusName } from "@/lib/utils";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import { Dex } from "@pkmn/sim";
 import { useSettings } from "@/store/settings";
 
@@ -1279,7 +1291,7 @@ export default function PlayerDisplay({
 			);
 		}
 
-		const spriteUrl = getSprite(pokemon, player, generation);
+		const spriteUrl = getSprite(pokemon, isSelf ? "p1" : "p2", generation);
 		const itemData = pokemonFromRequest?.item
 			? localDex.items.get(pokemonFromRequest.item)
 			: null;
@@ -1670,7 +1682,7 @@ import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Sprites } from "@pkmn/img";
 import { useSettings } from "@/store/settings";
 import { getGraphics } from "@/lib/constants";
-import type { PlayerRequest } from "@/services/battle-types";
+import type { PlayerRequest } from "@/lib/battle-types";
 import type { GenderName } from "@pkmn/types";
 
 type PokemonInfo = NonNullable<PlayerRequest["side"]["pokemon"][number]>;
@@ -1693,7 +1705,6 @@ export default function SwitchButton({
 
 	// Extract basic info
 
-	console.log(pokemonInfo);
 	const name = pokemonInfo.details.split(",")[0].replace(/-.+$/, "");
 	const level = pokemonInfo.details.match(/, L(\d+)/)?.[1] || "100";
 	const gender = pokemonInfo.details.includes(", M")
@@ -1774,153 +1785,6 @@ export default function SwitchButton({
 
 
 ---
-app/services/battle-types.ts
----
-import type { Pokemon, Battle } from "@pkmn/client";
-
-/**
- * Interface for move data
- */
-export interface MoveData {
-    id: string;
-    move: string;
-    pp: number;
-    maxpp: number;
-    disabled?: boolean;
-}
-
-/**
- * Interface for battle options
- */
-export interface BattleOptions {
-    format: string;
-    p1Name: string;
-    p2Name: string;
-    p1Team?: string;
-    p2Team?: string;
-    onBattleUpdate?: (state: BattleState) => void;
-}
-
-/**
- * Interface for player state in battle
- */
-export interface PlayerState {
-    name?: string;
-    active: Pokemon | null;
-    team: Pokemon[];
-    request: PlayerRequest | null;
-    selectedMove: PlayerDecision | null;
-}
-
-/**
- * Interface for battle state
- */
-export interface BattleState {
-    battle: Battle;
-    logs: string[];
-    p1Request: PlayerRequest | null;
-    p2Request: PlayerRequest | null;
-}
-
-/**
- * Interface for player request from the battle stream
- */
-export interface PlayerRequest {
-    active?: {
-        moves: Array<{
-            id: string;
-            pp: number;
-            maxpp: number;
-            target: string;
-            disabled?: boolean;
-        }>;
-        trapped?: boolean;
-        maybeTrapped?: boolean;
-        canSwitch?: boolean | number[];
-    }[];
-    side: {
-        name: string;
-        id: string;
-        pokemon: Array<{
-            ident: string;
-            details: string;
-            condition: string;
-            active: boolean;
-            stats: {
-                atk: number;
-                def: number;
-                spa: number;
-                spd: number;
-                spe: number;
-            };
-            moves: string[];
-            baseAbility: string;
-            item: string;
-            pokeball: string;
-            ability: string;
-            reviving?: boolean;
-            fainted?: boolean;
-        }>;
-    };
-    forceSwitch?: boolean[];
-    wait?: boolean;
-    rqid?: number;
-}
-
-/**
- * Interface for player move decisions
- */
-export interface MoveDecision {
-    type: "move";
-    moveIndex: number;
-}
-
-/**
- * Interface for player switch decision
- */
-export interface SwitchDecision {
-    type: "switch";
-    pokemonIndex: number;
-}
-
-/**
- * Union type for player decisions
- */
-export type PlayerDecision = MoveDecision | SwitchDecision;
-
-/**
- * Interface for battle turn result
- */
-export interface TurnResult {
-    turn: number;
-    state: Readonly<BattleState>;
-}
-
-/**
- * Interface for battle end result
- */
-export interface BattleEndResult {
-    winner: string;
-    state: Readonly<BattleState>;
-}
-
-/**
- * Interface for player move event
- */
-export interface PlayerMoveEvent {
-    player: "p1" | "p2";
-    moveIndex: number;
-}
-
-/**
- * Interface for player request event
- */
-export interface PlayerRequestEvent {
-    player: "p1" | "p2";
-    request: PlayerRequest;
-} 
-
----
 app/store/settings.ts
 ---
 import { create } from "zustand";
@@ -1951,14 +1815,9 @@ app/store/socket.ts
 import { v4 as uuidv4 } from "uuid";
 import { create } from "zustand";
 import { io, type Socket } from "socket.io-client";
-import type {
-	BattleState,
-	PlayerDecision,
-	PlayerRequest,
-} from "@/services/battle-types"; // Assuming types are shared or copied
-import { useEffect } from "react";
+import type { PlayerDecision, PlayerId } from "@/lib/battle-types";
 
-// Define the shape of the server events data (adjust as needed)
+// Define the shape of the server events data
 interface ServerToClientEvents {
 	"server:identified": (data: {
 		socketId: string;
@@ -1968,31 +1827,22 @@ interface ServerToClientEvents {
 	"server:error": (data: { message: string }) => void;
 	"server:battle_created": (data: {
 		battleId: string;
-		playerRole: "p1" | "p2";
+		playerRole: PlayerId;
 	}) => void;
 	"server:battle_joined": (data: {
 		battleId: string;
-		playerRole: "p1" | "p2";
+		playerRole: PlayerId;
 		opponentUserId?: string;
 	}) => void;
-	"server:battle_update": (data: {
-		battleId: string;
-		state: BattleState;
-	}) => void; // Server sends the whole state
-	"server:battle_request": (data: {
-		battleId: string;
-		request: PlayerRequest;
-	}) => void; // Server sends specific request
+	"server:protocol": (data: { battleId: string; lines: string[] }) => void;
 	"server:battle_end": (data: {
 		battleId: string;
 		winner: string | null;
-		state: BattleState;
 	}) => void;
 	"server:opponent_disconnected": (data: {
 		battleId: string;
 		message: string;
 	}) => void;
-	// Add other events as needed
 }
 
 // Define the shape of the client events data (adjust as needed)
@@ -2014,6 +1864,8 @@ interface SocketState {
 	userId: string | null;
 	socketId: string | null;
 	error: string | null;
+	currentBattleId: string | null;
+	playerRole: PlayerId | null;
 	connect: (userId: string) => void;
 	disconnect: () => void;
 	identify: () => void;
@@ -2021,7 +1873,11 @@ interface SocketState {
 		event: Event,
 		...args: Parameters<ClientToServerEvents[Event]>
 	) => void; // Helper for type-safe emits
-	// Add specific listeners setup if needed, or handle in components
+	// Add battle-specific actions
+	createBattle: (format: string) => void;
+	joinBattle: (battleId: string) => void;
+	leaveBattle: () => void;
+	makeDecision: (decision: PlayerDecision) => void;
 }
 
 // Ensure this URL points to your running WebSocket server
@@ -2034,17 +1890,18 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 	userId: null,
 	socketId: null,
 	error: null,
+	currentBattleId: null,
+	playerRole: null,
 
 	connect: (userId) => {
 		if (get().socket) {
 			console.log("Socket already exists. Disconnecting first.");
-			get().disconnect(); // Ensure clean state if reconnecting
+			get().disconnect();
 		}
 
-		console.log(`Attempting to connect to ${SERVER_URL} as user ${userId}...`);
-		set({ userId: userId, error: null }); // Set userId immediately
+		console.log(`Connecting to ${SERVER_URL} as ${userId}...`);
+		set({ userId, error: null });
 
-		// Explicitly specify WebSocket transport
 		const newSocket = io(SERVER_URL, {
 			transports: ["websocket"],
 			reconnectionAttempts: 5,
@@ -2059,7 +1916,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 				socketId: newSocket.id,
 				error: null,
 			});
-			get().identify(); // Automatically identify upon connection
+			get().identify();
 		});
 
 		newSocket.on("disconnect", (reason) => {
@@ -2069,39 +1926,55 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 				isConnected: false,
 				socketId: null,
 				error: `Disconnected: ${reason}`,
+				currentBattleId: null,
+				playerRole: null,
 			});
 		});
 
 		newSocket.on("connect_error", (err) => {
 			console.error("Socket connection error:", err);
 			set({
-				socket: null, // Ensure socket is null on error
+				socket: null,
 				isConnected: false,
 				socketId: null,
 				error: `Connection failed: ${err.message}`,
+				currentBattleId: null,
+				playerRole: null,
 			});
 		});
 
-		// --- Centralized Server Event Listeners (Optional but Recommended) ---
-		// You can register listeners here that update the store directly,
-		// or let components register their own specific listeners.
-		// For now, we'll keep it simple and add specific listeners later.
+		// Battle-specific event handlers
+		newSocket.on("server:battle_created", (data) => {
+			console.log("Battle created:", data);
+			set({ currentBattleId: data.battleId, playerRole: data.playerRole });
+		});
 
+		newSocket.on("server:battle_joined", (data) => {
+			console.log("Battle joined:", data);
+			set({ currentBattleId: data.battleId, playerRole: data.playerRole });
+		});
+
+		newSocket.on("server:battle_end", (data) => {
+			console.log("Battle ended:", data);
+			// Don't clear battle ID immediately to allow for end-game UI
+			// Component should call leaveBattle when ready
+		});
+
+		newSocket.on("server:opponent_disconnected", (data) => {
+			console.log("Opponent disconnected:", data);
+			set({ error: data.message });
+			// Don't clear battle state here, let the battle_end event handle it
+		});
+
+		// Global event handlers
 		newSocket.on("server:identified", (data) => {
 			console.log("Server identified client:", data);
-			// socketId is already set on 'connect', userId is set in connect()
-			// You could add extra checks here if needed
 		});
 
 		newSocket.on("server:error", (data) => {
 			console.error("Server error:", data.message);
-			set({ error: `Server error: ${data.message}` });
-			// Potentially disconnect or show UI feedback based on error type
+			set({ error: data.message });
 		});
-
-		// --- End Centralized Listeners ---
-
-		// Note: We don't set the socket in the store *until* 'connect' fires.
 	},
 
 	disconnect: () => {
@@ -2110,7 +1983,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 			console.log("Disconnecting socket...");
 			socket.disconnect();
 		}
-		set({ socket: null, isConnected: false, socketId: null, error: null });
+		set({
+			socket: null,
+			isConnected: false,
+			socketId: null,
+			error: null,
+			currentBattleId: null,
+			playerRole: null,
+		});
 	},
 
 	identify: () => {
@@ -2123,7 +2003,6 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 		}
 	},
 
-	// Generic emit function for type safety
 	emit: (event, ...args) => {
 		const { socket } = get();
 		if (socket?.connected) {
@@ -2132,8 +2011,43 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 		} else {
 			console.error(`Cannot emit ${event}: Socket not connected.`);
 			set({ error: `Cannot emit ${event}: Socket not connected.` });
-			// Potentially queue the event or show an error
 		}
+	},
+
+	// Battle-specific actions
+	createBattle: (format: string) => {
+		const { userId } = get();
+		if (!userId) {
+			set({ error: "Cannot create battle: User ID not set." });
+			return;
+		}
+		get().emit("client:create_battle", { format, userId });
+	},
+
+	joinBattle: (battleId: string) => {
+		const { userId } = get();
+		if (!userId) {
+			set({ error: "Cannot join battle: User ID not set." });
+			return;
+		}
+		get().emit("client:join_battle", { battleId, userId });
+	},
+
+	leaveBattle: () => {
+		const { currentBattleId } = get();
+		if (currentBattleId) {
+			get().emit("client:leave_battle", { battleId: currentBattleId });
+			set({ currentBattleId: null, playerRole: null });
+		}
+	},
+
+	makeDecision: (decision: PlayerDecision) => {
+		const { currentBattleId } = get();
+		if (!currentBattleId) {
+			set({ error: "Cannot make decision: Not in a battle." });
+			return;
+		}
+		get().emit("client:decision", { battleId: currentBattleId, decision });
 	},
 }));
 
@@ -2155,10 +2069,147 @@ export function getOrSetUserId(): string {
 
 
 ---
+lib/battle-types.ts
+---
+import type { Pokemon, Battle } from "@pkmn/client";
+
+/**
+ * Interface for move data
+ */
+export interface MoveData {
+	id: string;
+	move: string;
+	pp: number;
+	maxpp: number;
+	disabled?: boolean;
+}
+
+/**
+ * Interface for player state in battle
+ */
+export interface PlayerState {
+	name?: string;
+	active: Pokemon | null;
+	team: Pokemon[];
+	request: PlayerRequest | null;
+	selectedMove: PlayerDecision | null;
+}
+
+/**
+ * Interface for battle state
+ */
+export interface BattleState {
+	battle: Battle;
+	logs: string[];
+	p1Request: PlayerRequest | null;
+	p2Request: PlayerRequest | null;
+}
+
+export type PlayerId = "p1" | "p2";
+
+/**
+ * Interface for player request from the battle stream
+ */
+export interface PlayerRequest {
+	active?: {
+		moves: Array<{
+			id: string;
+			pp: number;
+			maxpp: number;
+			target: string;
+			disabled?: boolean;
+		}>;
+		trapped?: boolean;
+		maybeTrapped?: boolean;
+		canSwitch?: boolean | number[];
+	}[];
+	side: {
+		name: string;
+		id: string;
+		pokemon: Array<{
+			ident: string;
+			details: string;
+			condition: string;
+			active: boolean;
+			stats: {
+				atk: number;
+				def: number;
+				spa: number;
+				spd: number;
+				spe: number;
+			};
+			moves: string[];
+			baseAbility: string;
+			item: string;
+			pokeball: string;
+			ability: string;
+			reviving?: boolean;
+			fainted?: boolean;
+		}>;
+	};
+	forceSwitch?: boolean[];
+	wait?: boolean;
+	rqid?: number;
+}
+
+/**
+ * Interface for player move decisions
+ */
+export interface MoveDecision {
+	type: "move";
+	moveIndex: number;
+}
+
+/**
+ * Interface for player switch decision
+ */
+export interface SwitchDecision {
+	type: "switch";
+	pokemonIndex: number;
+}
+
+/**
+ * Union type for player decisions
+ */
+export type PlayerDecision = MoveDecision | SwitchDecision;
+
+/**
+ * Interface for battle turn result
+ */
+export interface TurnResult {
+	turn: number;
+	state: Readonly<BattleState>;
+}
+
+/**
+ * Interface for battle end result
+ */
+export interface BattleEndResult {
+	winner: string;
+	state: Readonly<BattleState>;
+}
+
+/**
+ * Interface for player move event
+ */
+export interface PlayerMoveEvent {
+	player: "p1" | "p2";
+	moveIndex: number;
+}
+
+/**
+ * Interface for player request event
+ */
+export interface PlayerRequestEvent {
+	player: "p1" | "p2";
+	request: PlayerRequest;
+}
+
+
+---
 lib/constants.ts
 ---
 import type { GraphicsGen } from "@pkmn/img";
-import { PRNG } from "@pkmn/sim";
 import type { GenerationNum, TypeName } from "@pkmn/types";
 
 const SPRITES: { [gen in GenerationNum]: GraphicsGen } = {
@@ -2540,6 +2591,12 @@ server/package.json
   "name": "server",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist",
+    "serve": "bun run dist/index.js"
+  },
   "private": true,
   "devDependencies": {
     "@types/bun": "latest"
@@ -2596,7 +2653,7 @@ server/tsconfig.json
 ---
 server/services/battle-engine.ts
 ---
-import { Battle } from "@pkmn/sim";
+import { Battle, type ID } from "@pkmn/sim";
 import { Generations } from "@pkmn/data";
 import { Protocol } from "@pkmn/protocol";
 import { TeamGenerators } from "@pkmn/randoms";
@@ -2619,8 +2676,7 @@ import type {
 } from "./battle-types";
 import { ManualPlayer } from "./player";
 
-// Redefine BattleEventMap for Protocol Lines
-export interface BattleProtocolEventMap {
+export interface BattleProtocolEventMap extends Record<string, unknown> {
 	protocol: { type: "omniscient" | "p1" | "p2"; lines: string[] };
 	request: { player: "p1" | "p2"; request: PlayerRequest };
 	battleEnd: { winner: string | null };
@@ -2638,17 +2694,19 @@ export class BattleEngine {
 	private prng: PRNG;
 	private dex: ModdedDex;
 	private gens: Generations;
-	private format: string;
+	private format: ID;
 	private eventEmitter: BattleEventEmitter<BattleProtocolEventMap>;
 	private p1: ManualPlayer;
 	private p2: ManualPlayer;
 	private p1Request: PlayerRequest | null = null;
 	private p2Request: PlayerRequest | null = null;
 	private battleId: string;
+	private debug: boolean;
 
 	constructor(battleId: string, options: BattleOptions) {
 		this.battleId = battleId;
-		this.format = options.format || "gen3randombattle";
+		this.format = (options.format as ID) || ("gen3randombattle" as ID);
+		this.debug = options.debug ?? false;
 		this.prng = new PRNG();
 		this.dex = Dex.forFormat(this.format);
 		// @ts-ignore
@@ -2657,7 +2715,7 @@ export class BattleEngine {
 
 		DTeams.setGeneratorFactory(TeamGenerators);
 		this.streams = BattleStreams.getPlayerStreams(
-			new BattleStreams.BattleStream(),
+			new BattleStreams.BattleStream({ debug: this.debug }),
 		);
 		this.p1Stream = this.streams.p1;
 		this.p2Stream = this.streams.p2;
@@ -2665,58 +2723,76 @@ export class BattleEngine {
 
 		this.p1 = new ManualPlayer(
 			this.p1Stream,
-			false,
+			this.debug,
 			options.p1Name,
 			(request: PlayerRequest) => this.handlePlayerRequest("p1", request),
 			(lines: string[]) => this.handlePlayerProtocol("p1", lines),
 		);
 		this.p2 = new ManualPlayer(
 			this.p2Stream,
-			false,
+			this.debug,
 			options.p2Name,
 			(request: PlayerRequest) => this.handlePlayerRequest("p2", request),
 			(lines: string[]) => this.handlePlayerProtocol("p2", lines),
 		);
 
-		this.startOmniscientStream();
+		void this.startOmniscientStream();
 	}
 
 	private async startOmniscientStream(): Promise<void> {
 		try {
 			for await (const chunk of this.streams.omniscient) {
 				const lines = chunk.split("\n").filter((line) => line.length > 0);
+				if (lines.length === 0) continue;
 
-				// Process lines internally FIRST
 				for (const line of lines) {
-					const { args, kwArgs } = Protocol.parseBattleLine(line);
-					this.battle.add(args, kwArgs);
+					try {
+						const { args, kwArgs } = Protocol.parseBattleLine(line);
+						// @ts-ignore
+						this.battle.add(args, kwArgs);
+					} catch (e) {
+						console.error(
+							`[BattleEngine ${this.battleId}] Error parsing omni line: "${line}"`,
+							e,
+						);
+						this.eventEmitter.emit("protocol", {
+							type: "omniscient",
+							lines: [
+								`|error|[ProtocolParseError] ${e instanceof Error ? e.message : String(e)}`,
+							],
+						});
+					}
 				}
 
-				// Emit the raw lines for the clients
 				this.eventEmitter.emit("protocol", { type: "omniscient", lines });
 
-				// Check for battle end condition after processing lines
 				if (this.battle.ended) {
-					console.log(
-						`[BattleEngine ${this.battleId}] Battle ended internally. Winner: ${this.battle.winner}`,
-					);
+					if (this.debug) {
+						console.log(
+							`[BattleEngine ${this.battleId}] Battle ended internally. Winner: ${this.battle.winner}`,
+						);
+					}
 					this.eventEmitter.emit("battleEnd", {
 						winner: this.battle.winner || null,
 					});
 					break;
 				}
 			}
-			console.log(
-				`[BattleEngine ${this.battleId}] Omniscient stream finished.`,
-			);
+			if (this.debug) {
+				console.log(
+					`[BattleEngine ${this.battleId}] Omniscient stream finished.`,
+				);
+			}
 		} catch (error) {
 			console.error(
 				`[BattleEngine ${this.battleId}] Omniscient stream error:`,
 				error,
 			);
 			this.eventEmitter.emit("battleEnd", {
-				winner: `error: ${error}`,
+				winner: null,
 			});
+		} finally {
+			this.destroy();
 		}
 	}
 
@@ -2812,8 +2888,23 @@ export class BattleEngine {
 		return this.eventEmitter.on(event, listener);
 	}
 
+	getP1Request(): Readonly<PlayerRequest> | null {
+		return this.p1Request;
+	}
+
+	getP2Request(): Readonly<PlayerRequest> | null {
+		return this.p2Request;
+	}
+
+	updatePlayerName(player: "p1" | "p2", name: string): void {
+		if (player === "p1") this.p1.playerName = name;
+		else this.p2.playerName = name;
+	}
+
 	destroy(): void {
-		console.log(`[BattleEngine ${this.battleId}] Destroying battle...`);
+		if (this.debug) {
+			console.log(`[BattleEngine ${this.battleId}] Destroying battle...`);
+		}
 		try {
 			this.streams.omniscient.destroy();
 		} catch (e) {
@@ -2853,63 +2944,77 @@ export interface BattleEventMap {
 }
 
 /**
- * Simple event emitter for battle events
+ * Simple event emitter with type safety
+ * @template T - Record mapping event names to their data types
  */
-export class BattleEventEmitter {
+export class BattleEventEmitter<
+	T extends Record<string, unknown> = Record<string, unknown>,
+> {
 	private events: {
-		[K in keyof BattleEventMap]?: Array<(data: BattleEventMap[K]) => void>;
+		[K in keyof T]?: Array<(data: T[K]) => void>;
 	} = {};
 
 	/**
 	 * Register an event listener with type safety
-	 * @param event - The event name
+	 * @param event - The event name (key of T)
 	 * @param listener - The event listener function
 	 * @returns A function to unsubscribe
 	 */
-	on<K extends keyof BattleEventMap>(
-		event: K,
-		listener: (data: BattleEventMap[K]) => void,
-	): () => void {
+	on<K extends keyof T>(event: K, listener: (data: T[K]) => void): () => void {
 		if (!this.events[event]) {
 			this.events[event] = [];
 		}
 
-		this.events[event]?.push(listener);
+		const listeners = this.events[event];
+		if (listeners) {
+			// Type assertion needed due to TypeScript's limitations with arrays and callbacks
+			(listeners as Array<(data: T[K]) => void>).push(listener);
+		}
 
 		return () => {
-			if (this.events[event]) {
-				this.events[event] = this.events[event]?.filter((l) => l !== listener);
+			const currentListeners = this.events[event];
+			if (currentListeners) {
+				// Filter out the specific listener instance
+				this.events[event] = currentListeners.filter(
+					(l) => l !== listener,
+				) as Array<(data: T[K]) => void>;
 			}
 		};
 	}
 
 	/**
 	 * Emit an event with type safety
-	 * @param event - The event name
-	 * @param data - The event data
+	 * @param event - The event name (key of T)
+	 * @param data - The event data (type T[K])
 	 */
-	emit<K extends keyof BattleEventMap>(
+	emit<K extends keyof T>(
 		event: K,
-		data?: BattleEventMap[K],
+		...args: T[K] extends undefined ? [data?: T[K]] : [data: T[K]]
 	): void {
-		if (!this.events[event]) return;
+		const data = args[0];
+		const listeners = this.events[event];
+		if (!listeners?.length) return;
 
-		for (const listener of this.events[event] || []) {
+		// Create a copy of listeners array to prevent modification during iteration
+		const currentListeners = [...listeners];
+
+		for (const listener of currentListeners) {
 			try {
-				listener(data as BattleEventMap[K]);
+				// Type assertion needed due to TypeScript's limitations with arrays and callbacks
+				(listener as (data: T[K]) => void)(data as T[K]);
 			} catch (error) {
-				console.error(`Error in event listener for ${event}:`, error);
+				console.error(`Error in event listener for ${String(event)}:`, error);
 			}
 		}
 	}
 
 	/**
-	 * Remove all listeners for an event
-	 * @param event - The event name (optional, if not provided, removes all listeners)
+	 * Remove all listeners for an event or all events
+	 * @param event - The event name (optional, key of T)
 	 */
-	removeAllListeners(event?: keyof BattleEventMap): void {
+	removeAllListeners(event?: keyof T): void {
 		if (event) {
-			this.events[event] = [];
+			delete this.events[event];
 		} else {
 			this.events = {};
 		}
@@ -2985,7 +3090,12 @@ export class BattleManager {
 	 * @returns True if battle was removed, false if not found
 	 */
 	removeBattle(battleId: string): boolean {
-		return this.battles.delete(battleId);
+		const engine = this.battles.get(battleId);
+		if (engine) {
+			engine.destroy();
+			return this.battles.delete(battleId);
+		}
+		return false;
 	}
 
 	/**
@@ -3035,16 +3145,18 @@ export class BattleManager {
 ---
 server/services/battle-types.ts
 ---
-import type { Pokemon, Battle } from "@pkmn/sim";
+import type { Pokemon, Battle, ID } from "@pkmn/sim";
+import type { Args } from "@pkmn/protocol";
 
 /**
- * Interface for move data
+ * Interface for move data in a request
  */
 export interface MoveData {
-	id: string;
+	id: ID;
 	move: string;
 	pp: number;
 	maxpp: number;
+	target?: string;
 	disabled?: boolean;
 }
 
@@ -3057,14 +3169,14 @@ export interface BattleOptions {
 	p2Name: string;
 	p1Team?: string;
 	p2Team?: string;
-	onBattleUpdate?: (state: BattleState) => void;
+	debug?: boolean;
 }
 
 /**
  * Interface for player state in battle
  */
 export interface PlayerState {
-	name?: string;
+	name: string;
 	active: Pokemon | null;
 	team: Pokemon[];
 	request: PlayerRequest | null;
@@ -3072,7 +3184,7 @@ export interface PlayerState {
 }
 
 /**
- * Interface for battle state
+ * Interface for battle state - mainly used for debugging and testing
  */
 export interface BattleState {
 	battle: Battle;
@@ -3085,9 +3197,10 @@ export interface BattleState {
  * Interface for player request from the battle stream
  */
 export interface PlayerRequest {
-	active?: {
+	active?: Array<{
 		moves: Array<{
-			id: string;
+			id: ID;
+			move: string;
 			pp: number;
 			maxpp: number;
 			target: string;
@@ -3096,10 +3209,10 @@ export interface PlayerRequest {
 		trapped?: boolean;
 		maybeTrapped?: boolean;
 		canSwitch?: boolean | number[];
-	}[];
+	}>;
 	side: {
 		name: string;
-		id: string;
+		id: ID;
 		pokemon: Array<{
 			ident: string;
 			details: string;
@@ -3112,11 +3225,11 @@ export interface PlayerRequest {
 				spd: number;
 				spe: number;
 			};
-			moves: string[];
-			baseAbility: string;
-			item: string;
+			moves: ID[];
+			baseAbility: ID;
+			item: ID;
 			pokeball: string;
-			ability: string;
+			ability: ID;
 			reviving?: boolean;
 			fainted?: boolean;
 		}>;
@@ -3132,6 +3245,7 @@ export interface PlayerRequest {
 export interface MoveDecision {
 	type: "move";
 	moveIndex: number;
+	targetIndex?: number; // For moves that require a target
 }
 
 /**
@@ -3148,36 +3262,29 @@ export interface SwitchDecision {
 export type PlayerDecision = MoveDecision | SwitchDecision;
 
 /**
- * Interface for battle turn result
+ * Type for protocol line handlers
  */
-export interface TurnResult {
-	turn: number;
-	state: Readonly<BattleState>;
-}
+export type ProtocolLineHandler = (lines: string[]) => void;
 
 /**
- * Interface for battle end result
+ * Type for request handlers
  */
-export interface BattleEndResult {
-	winner: string;
-	state: Readonly<BattleState>;
-}
+export type RequestHandler = (request: PlayerRequest) => void;
 
 /**
- * Interface for player move event
+ * Type for player identifiers
  */
-export interface PlayerMoveEvent {
-	player: "p1" | "p2";
-	moveIndex: number;
-}
+export type PlayerId = "p1" | "p2";
 
 /**
- * Interface for player request event
+ * Type for protocol line types
  */
-export interface PlayerRequestEvent {
-	player: "p1" | "p2";
-	request: PlayerRequest;
-}
+export type ProtocolLineType = "omniscient" | PlayerId;
+
+/**
+ * Type for battle protocol args from @pkmn/protocol
+ */
+export type BattleProtocolArgs = Args;
 
 
 ---
@@ -3242,30 +3349,32 @@ export class ManualPlayer {
 	 */
 	receive(chunk: string): void {
 		if (this.debug) console.log(`${this.playerName} received:`, chunk);
-		const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+		const playerSpecificLines: string[] = [];
 
-		if (lines.length > 0) {
-			// Pass ALL non-empty lines up to the engine
-			this.onProtocolLine(lines);
+		for (const line of chunk.split("\n")) {
+			if (!line) continue;
 
-			// Process requests and errors specifically
-			for (const line of lines) {
-				if (line.startsWith("|request|")) {
-					try {
-						const requestJson = line.substring(9); // Skip "|request|"
-						const request = JSON.parse(requestJson);
-						this.receiveRequest(request);
-					} catch (e) {
-						console.error(
-							`${this.playerName} error parsing request JSON:`,
-							e,
-							line,
-						);
-					}
-				} else if (line.startsWith("|error|")) {
-					this.receiveError(new Error(line.substring(7))); // Skip "|error|"
+			if (line.startsWith("|request|")) {
+				playerSpecificLines.push(line);
+				try {
+					const requestJson = line.substring(9);
+					const request = JSON.parse(requestJson);
+					this.receiveRequest(request);
+				} catch (e) {
+					console.error(`${this.playerName} error parsing request JSON:`, e, line);
+					if (!playerSpecificLines.includes(line)) playerSpecificLines.push(line);
 				}
+			} else if (line.startsWith("|error|")) {
+				const errorMsg = line.substring(7);
+				if (errorMsg.startsWith("[Unavailable choice]") || errorMsg.startsWith("[Invalid choice]")) {
+					playerSpecificLines.push(line);
+				}
+				this.receiveError(new Error(errorMsg));
 			}
+		}
+
+		if (playerSpecificLines.length > 0) {
+			this.onProtocolLine(playerSpecificLines);
 		}
 	}
 
@@ -3274,11 +3383,7 @@ export class ManualPlayer {
 	 * @param error - The error
 	 */
 	receiveError(error: Error): void {
-		console.error(`${this.playerName} received battle error:`, error.message);
-		// Note: The error line is already sent via onProtocolLine
-
-		// Don't throw on unavailable choice errors as they're handled by followup requests
-		if (error.message.startsWith("[Unavailable choice]")) return;
+		console.error(`${this.playerName} received error line:`, error.message);
 	}
 
 	/**
@@ -3329,10 +3434,8 @@ import { battleManager } from "../services/battle-manager-instance";
 import type {
 	BattleOptions,
 	PlayerDecision,
-	PlayerRequest,
-	BattleState,
+	PlayerId,
 } from "../services/battle-types";
-import type { Battle } from "@pkmn/client";
 
 // --- Basic Server Setup ---
 const app = express();
@@ -3352,7 +3455,7 @@ const PORT = process.env.PORT || 8080;
 interface ClientInfo {
 	userId: string;
 	currentBattleId?: string;
-	playerRole?: "p1" | "p2";
+	playerRole?: PlayerId;
 }
 
 interface SocketInfo {
@@ -3367,6 +3470,8 @@ interface BattleRoom {
 	spectators: string[];
 	format: string;
 	started: boolean;
+	p1Decision: PlayerDecision | null;
+	p2Decision: PlayerDecision | null;
 }
 
 const connectedClients = new Map<string, ClientInfo>();
@@ -3423,9 +3528,6 @@ io.on("connection", (socket: Socket) => {
 		(data: { format: string; userId: string }) => {
 			const clientInfo = getClientInfo(socket.id);
 			if (!clientInfo || clientInfo.userId !== data.userId) {
-				console.warn(
-					`[Socket ${socket.id}] Create battle request from unidentified or mismatched user.`,
-				);
 				socket.emit("server:error", {
 					message: "Identify first or user ID mismatch.",
 				});
@@ -3449,15 +3551,10 @@ io.on("connection", (socket: Socket) => {
 
 			try {
 				const battleOptions: BattleOptions = {
-					format: format,
-					p1Name: p1Name,
-					p2Name: p2Name,
-					onBattleUpdate: (state: BattleState) => {
-						const room = getBattleRoom(battleId);
-						if (room?.started) {
-							io.to(battleId).emit("server:battle_update", { battleId, state });
-						}
-					},
+					format,
+					p1Name,
+					p2Name,
+					debug: process.env.NODE_ENV === "development",
 				};
 
 				const battleEngine = battleManager.createBattle(
@@ -3465,51 +3562,63 @@ io.on("connection", (socket: Socket) => {
 					battleOptions,
 				);
 
-				battleEngine.on("playerRequest", ({ player, request }) => {
+				// Wire up protocol events
+				battleEngine.on("protocol", ({ type, lines }) => {
 					const battleRoom = getBattleRoom(battleId);
-					if (!battleRoom || !battleRoom.started) return;
+					if (!battleRoom?.started) return;
+
+					if (type === "omniscient") {
+						io.to(battleId).emit("server:protocol", { battleId, lines });
+					} else {
+						const targetSocketId =
+							type === "p1" ? battleRoom.p1?.socketId : battleRoom.p2?.socketId;
+						if (targetSocketId) {
+							io.to(targetSocketId).emit("server:protocol", {
+								battleId,
+								lines,
+							});
+						}
+					}
+				});
+
+				// Wire up request events
+				battleEngine.on("request", ({ player, request }) => {
+					const battleRoom = getBattleRoom(battleId);
+					if (!battleRoom?.started) return;
 
 					const targetSocketId =
 						player === "p1" ? battleRoom.p1?.socketId : battleRoom.p2?.socketId;
 					if (targetSocketId) {
-						io.to(targetSocketId).emit("server:battle_request", {
+						const requestLine = `|request|${JSON.stringify(request)}`;
+						io.to(targetSocketId).emit("server:protocol", {
 							battleId,
-							request,
+							lines: [requestLine],
 						});
-						console.log(
-							`[Battle ${battleId}] Sent request to ${player} (${targetSocketId})`,
-						);
-					} else {
-						console.warn(
-							`[Battle ${battleId}] Could not find socket ID for ${player} to send request.`,
-						);
+						console.log(`[Battle ${battleId}] Sent request to ${player}`);
 					}
 				});
 
-				battleEngine.on("battleEnd", ({ winner, state }) => {
-					io.to(battleId).emit("server:battle_end", {
-						battleId,
-						winner,
-						state,
-					});
-					console.log(
-						`[Battle ${battleId}] Ended. Winner: ${winner}. Notifying room.`,
-					);
-					const room = getBattleRoom(battleId);
-					if (room) room.started = false;
-					setTimeout(() => {
-						activeBattles.delete(battleId);
-						console.log(`[Battle ${battleId}] Removed battle room state.`);
-					}, 61000);
+				// Wire up battle end
+				battleEngine.on("battleEnd", ({ winner }) => {
+					const battleRoom = getBattleRoom(battleId);
+					if (!battleRoom) return;
+
+					io.to(battleId).emit("server:battle_end", { battleId, winner });
+					console.log(`[Battle ${battleId}] Battle ended. Winner: ${winner}`);
+
+					battleRoom.started = false;
+					// Cleanup handled by manager's timeout
 				});
 
 				const newBattleRoom: BattleRoom = {
-					battleId: battleId,
+					battleId,
 					p1: { socketId: socket.id, userId: clientInfo.userId },
 					p2: null,
 					spectators: [],
-					format: format,
+					format,
 					started: false,
+					p1Decision: null,
+					p2Decision: null,
 				};
 				activeBattles.set(battleId, newBattleRoom);
 
@@ -3517,24 +3626,14 @@ io.on("connection", (socket: Socket) => {
 				clientInfo.playerRole = "p1";
 
 				socket.join(battleId);
-				console.log(
-					`[Socket ${socket.id}] User ${clientInfo.userId} joined room ${battleId} as P1.`,
-				);
-
-				socket.emit("server:battle_created", {
-					battleId: battleId,
-					playerRole: "p1",
-				});
-
+				socket.emit("server:battle_created", { battleId, playerRole: "p1" });
 				console.log(`[Battle ${battleId}] Waiting for P2 to join.`);
-			} catch (error) {
+			} catch (error: unknown) {
 				console.error(`[Socket ${socket.id}] Error creating battle:`, error);
 				socket.emit("server:error", {
-					message: `Failed to create battle: ${error}`,
+					message: `Failed to create battle: ${error instanceof Error ? error.message : String(error)}`,
 				});
-				if (battleManager.getBattle(battleId)) {
-					battleManager.removeBattle(battleId);
-				}
+				battleManager.removeBattle(battleId);
 			}
 		},
 	);
@@ -3552,50 +3651,58 @@ io.on("connection", (socket: Socket) => {
 				return;
 			}
 
-			if (clientInfo.currentBattleId) {
-				if (clientInfo.currentBattleId === battleId) {
-					console.log(
-						`[Socket ${socket.id}] User ${clientInfo.userId} rejoining battle ${battleId}.`,
-					);
-					socket.join(battleId);
-					const battleRoom = getBattleRoom(battleId);
-					socket.emit("server:battle_joined", {
-						battleId: battleId,
-						playerRole: clientInfo.playerRole,
-						opponentUserId:
-							clientInfo.playerRole === "p1"
-								? battleRoom?.p2?.userId
-								: battleRoom?.p1?.userId,
-					});
+			const battleRoom = getBattleRoom(battleId);
 
-					const engine = battleManager.getBattle(battleId);
-					if (engine && battleRoom?.started) {
-						const currentBattleState = {
-							battle: engine.getBattle(),
-							logs: engine.getLogs(),
-							p1Request: engine.getP1Request(),
-							p2Request: engine.getP2Request(),
-						};
-						socket.emit("server:battle_update", {
+			// --- Rejoin Logic ---
+			if (clientInfo.currentBattleId === battleId && battleRoom) {
+				console.log(
+					`[Socket ${socket.id}] User ${clientInfo.userId} rejoining battle ${battleId}.`,
+				);
+				socket.join(battleId);
+				socket.emit("server:battle_joined", {
+					battleId,
+					playerRole: clientInfo.playerRole,
+					opponentUserId:
+						clientInfo.playerRole === "p1"
+							? battleRoom.p2?.userId
+							: battleRoom.p1?.userId,
+				});
+
+				const engine = battleManager.getBattle(battleId);
+				if (engine && battleRoom.started) {
+					// Send current request if applicable
+					const request =
+						clientInfo.playerRole === "p1"
+							? engine.getP1Request()
+							: engine.getP2Request();
+					if (request) {
+						const requestLine = `|request|${JSON.stringify(request)}`;
+						io.to(socket.id).emit("server:protocol", {
 							battleId,
-							state: currentBattleState,
+							lines: [requestLine],
 						});
-						const specificRequest =
-							clientInfo.playerRole === "p1"
-								? currentBattleState.p1Request
-								: currentBattleState.p2Request;
-						if (specificRequest) {
-							socket.emit("server:battle_request", {
-								battleId,
-								request: specificRequest,
-							});
-						}
+						console.log(
+							`[Battle ${battleId}] Re-sent request to rejoining ${clientInfo.playerRole}`,
+						);
 					}
-					return;
+				} else if (!engine) {
+					socket.emit("server:error", {
+						message: "Battle ended or could not be found on rejoin.",
+					});
+					clientInfo.currentBattleId = undefined;
+					clientInfo.playerRole = undefined;
+					activeBattles.delete(battleId);
 				}
+				return;
 			}
 
-			const battleRoom = getBattleRoom(battleId);
+			// --- New Join Logic ---
+			if (clientInfo.currentBattleId) {
+				socket.emit("server:error", {
+					message: "You are already in a battle.",
+				});
+				return;
+			}
 			if (!battleRoom) {
 				socket.emit("server:error", {
 					message: `Battle with ID ${battleId} not found.`,
@@ -3615,35 +3722,32 @@ io.on("connection", (socket: Socket) => {
 				return;
 			}
 
+			// Assign P2
 			console.log(
 				`[Socket ${socket.id}] User ${clientInfo.userId} joining battle ${battleId} as P2.`,
 			);
 			battleRoom.p2 = { socketId: socket.id, userId: clientInfo.userId };
 			clientInfo.currentBattleId = battleId;
 			clientInfo.playerRole = "p2";
-
+			const engine = battleManager.getBattle(battleId);
+			engine?.updatePlayerName("p2", clientInfo.userId);
 			socket.join(battleId);
-			console.log(
-				`[Socket ${socket.id}] User ${clientInfo.userId} joined room ${battleId} as P2.`,
-			);
 
+			// Notify players
 			socket.emit("server:battle_joined", {
-				battleId: battleId,
+				battleId,
 				playerRole: "p2",
 				opponentUserId: battleRoom.p1?.userId,
 			});
-
 			if (battleRoom.p1) {
 				io.to(battleRoom.p1.socketId).emit("server:battle_joined", {
-					battleId: battleId,
+					battleId,
 					playerRole: "p1",
 					opponentUserId: clientInfo.userId,
 				});
-				console.log(
-					`[Battle ${battleId}] Notified P1 (${battleRoom.p1.userId}) that P2 (${clientInfo.userId}) joined.`,
-				);
 			}
 
+			// Start the Battle
 			console.log(
 				`[Battle ${battleId}] Both players present. Starting battle simulation.`,
 			);
@@ -3658,13 +3762,18 @@ io.on("connection", (socket: Socket) => {
 				io.to(battleId).emit("server:error", {
 					message: `Failed to start battle: ${error}`,
 				});
-				activeBattles.delete(battleId);
+
+				const engine = battleManager.getBattle(battleId);
+				if (engine) engine.destroy();
 				battleManager.removeBattle(battleId);
+				activeBattles.delete(battleId);
+
+				// Reset client states
 				if (battleRoom.p1) {
-					const p1Client = getClientInfo(battleRoom.p1.socketId);
-					if (p1Client) {
-						p1Client.currentBattleId = undefined;
-						p1Client.playerRole = undefined;
+					const p1Info = getClientInfo(battleRoom.p1.socketId);
+					if (p1Info) {
+						p1Info.currentBattleId = undefined;
+						p1Info.playerRole = undefined;
 					}
 				}
 				clientInfo.currentBattleId = undefined;
@@ -3775,7 +3884,37 @@ io.on("connection", (socket: Socket) => {
 				data.decision,
 			);
 			try {
-				battleManager.makePlayerMove(data.battleId, playerRole, data.decision);
+				if (playerRole === "p1") {
+					battleRoom.p1Decision = data.decision;
+				} else {
+					battleRoom.p2Decision = data.decision;
+				}
+
+				if (battleRoom.p1Decision && battleRoom.p2Decision) {
+					console.log(
+						`[Battle ${data.battleId}] Both players have made their decisions.`,
+					);
+
+					// Both players have made their decisions, pass them to the engine
+					battleManager.makePlayerMove(
+						data.battleId,
+						"p1",
+						battleRoom.p1Decision,
+					);
+					battleManager.makePlayerMove(
+						data.battleId,
+						"p2",
+						battleRoom.p2Decision,
+					);
+
+					// Reset decisions for next turn
+					battleRoom.p1Decision = null;
+					battleRoom.p2Decision = null;
+				} else {
+					console.log(
+						`[Battle ${data.battleId}] Waiting for both players to make decisions.`,
+					);
+				}
 			} catch (error) {
 				console.error(
 					`[Battle ${data.battleId}] Error processing decision for ${playerRole}:`,

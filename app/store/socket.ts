@@ -39,7 +39,7 @@ interface ClientToServerEvents {
 	"client:join_battle": (data: { battleId: string; userId: string }) => void;
 	"client:decision": (data: {
 		battleId: string;
-		decision: PlayerDecision;
+		decision: PlayerDecision | null;
 	}) => void;
 	"client:leave_battle": (data: { battleId: string }) => void;
 	// Add other events as needed

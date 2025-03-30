@@ -214,11 +214,10 @@ export default function BattlePage() {
 	}, [socket, isConnected, battleId, userId, emit, processProtocolLines]);
 
 	const handlePlayerDecision = (decision: PlayerDecision | null) => {
-		if (!battleId || !playerRole || winner !== undefined || !decision) return;
+		if (!battleId || !playerRole || winner !== undefined) return;
 
 		console.log(`[Battle ${battleId}] Sending decision:`, decision);
 		emit("client:decision", { battleId, decision });
-		setPlayerRequest(null);
 	};
 
 	const handleReturnHome = () => {
