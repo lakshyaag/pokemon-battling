@@ -23,6 +23,9 @@ const io = new Server(server, {
 		origin: process.env.CLIENT_ORIGIN || "*",
 		methods: ["GET", "POST"],
 	},
+	pingInterval: 5000,
+	pingTimeout: 10000,
+
 });
 
 const PORT = process.env.PORT || 8080;
@@ -201,7 +204,9 @@ io.on("connection", (socket: Socket) => {
 				clientInfo.currentBattleId = battleId;
 				clientInfo.playerRole = "p1";
 
+				console.info('joining battle', battleId)
 				socket.join(battleId);
+				console.info('emitting battle_created', { battleId, playerRole: "p1" })
 				socket.emit("server:battle_created", { battleId, playerRole: "p1" });
 				console.log(`[Battle ${battleId}] Waiting for P2 to join.`);
 			} catch (error: unknown) {
