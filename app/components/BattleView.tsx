@@ -1,340 +1,318 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import type { BattleState } from "../services/battle-types";
-import type { Pokemon } from "@pkmn/client";
-import { BattleEngine } from "../services/battle-engine";
-import { TYPE_COLORS } from "@/lib/constants";
-import BattleMoveButton from "./BattleMoveButton";
+import type { BattleState, PlayerDecision } from "../services/battle-types";
+import type { Battle } from "@pkmn/client";
+import type { BattleEngine } from "../services/battle-engine";
 import { Badge } from "./ui/badge";
-import { getStatusClass, getStatusName } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { getSprite } from "../utils/pokemonUtils";
+import { battleManager } from "@/services/battle-manager-instance";
+import { useSettings } from "@/store/settings";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { ScrollArea } from "./ui/scroll-area";
+import PlayerDisplay from "./PlayerDisplay";
 
-interface BattleComponentProps {
-	format: string;
-	p1Name?: string;
-	p2Name?: string;
-	p1Team?: string;
-	p2Team?: string;
+interface BattleViewProps {
+	battleId: string;
 }
 
 /**
  * Component for displaying and interacting with a Pokémon battle
  */
-export default function BattleComponent({
-	format,
-	p1Name = "Player 1",
-	p2Name = "Player 2",
-	p1Team,
-	p2Team,
-}: BattleComponentProps) {
+export default function BattleView({ battleId }: BattleViewProps) {
 	const battleEngineRef = useRef<BattleEngine | null>(null);
-	const [battleState, setBattleState] = useState<BattleState>({
-		turn: 0,
-		p1: {
-			name: p1Name,
-			active: null,
-			team: [],
-			request: null,
-			selectedMove: null,
-		},
-		p2: {
-			name: p2Name,
-			active: null,
-			team: [],
-			request: null,
-			selectedMove: null,
-		},
-		weather: "none",
-		status: "Initializing battle...",
-		logs: [],
-		isComplete: false,
-		winner: null,
+	const { generation } = useSettings();
+	const [viewState, setViewState] = useState<BattleState | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [retryCount, setRetryCount] = useState(0);
+	const maxRetries = 3;
+	const logScrollAreaRef = useRef<HTMLDivElement>(null);
+	const [selectedDecisions, setSelectedDecisions] = useState<{
+		p1: PlayerDecision | null;
+		p2: PlayerDecision | null;
+	}>({
+		p1: null,
+		p2: null,
 	});
-	const [isInitialized, setIsInitialized] = useState(false);
 
-	// Initialize battle engine
+	// Effect for initializing battle and subscribing to updates
 	useEffect(() => {
-		if (!isInitialized) {
-			const battleEngine = new BattleEngine({
-				format,
-				p1Name,
-				p2Name,
-				p1Team,
-				p2Team,
-				onBattleUpdate: (state: BattleState) => {
-					setBattleState(state);
-				},
-			});
+		let retryTimeout: NodeJS.Timeout;
+		let mounted = true;
 
-			// Subscribe to state updates
-			battleEngine.on("stateUpdate", (state) => {
-				setBattleState(state);
-			});
-
-			battleEngineRef.current = battleEngine;
-			setIsInitialized(true);
-
-			// Start the battle
-			battleEngine.startBattle(p1Team, p2Team);
-
-			// Cleanup function
-			return () => {
-				// Clean up any subscriptions or resources
-			};
-		}
-	}, [format, p1Name, p2Name, p1Team, p2Team, isInitialized]);
-
-	// Handle move selection for player 1
-	const handleP1MoveSelect = (moveIndex: number) => {
-		if (!battleEngineRef.current) return;
-
-		battleEngineRef.current.processPlayerDecision("p1", {
-			type: "move",
-			moveIndex,
-		});
-	};
-
-	// Handle move selection for player 2
-	const handleP2MoveSelect = (moveIndex: number) => {
-		if (!battleEngineRef.current) return;
-
-		battleEngineRef.current.processPlayerDecision("p2", {
-			type: "move",
-			moveIndex,
-		});
-	};
-
-	// Parse HP and status from condition string
-	const parseCondition = (pokemon?: Pokemon) => {
-		if (!pokemon) return { currentHP: 0, maxHP: 0, status: "" };
-
-		const currentHP = pokemon.hp;
-		const maxHP = pokemon.maxhp;
-		const status = pokemon.status;
-
-		return { currentHP, maxHP, status };
-	};
-
-	// Render player's Pokémon information
-	const renderPokemonInfo = (player: "p1" | "p2") => {
-		const pokemon = battleState[player].active;
-		const pokemonFromRequest = battleState[player].request?.side.pokemon[0];
-
-		if (!pokemon) return <div>No active Pokémon</div>;
-
-		const sprite = getSprite(pokemon, player);
-		const item = pokemonFromRequest?.item
-			? battleEngineRef.current?.getItem(pokemonFromRequest.item)
-			: null;
-		const ability = pokemonFromRequest?.baseAbility
-			? battleEngineRef.current?.getAbility(pokemonFromRequest.baseAbility)
-			: null;
-
-		// Extract HP information from condition
-		const { currentHP, maxHP, status } = parseCondition(pokemon);
-
-		// Calculate HP percentage
-		const hpPercentage = maxHP > 0 ? (currentHP / maxHP) * 100 : 0;
-		let hpColor = "bg-green-500"; // Green
-		if (hpPercentage <= 50) hpColor = "bg-yellow-500"; // Yellow
-		if (hpPercentage <= 20) hpColor = "bg-red-500"; // Red
-
-		return (
-			<div className="mb-5">
-				<div className="flex items-center mb-3">
-					<img
-						src={sprite?.url}
-						alt={pokemon.name}
-						className="w-24 h-24 mr-3"
-					/>
-					<div>
-						<h3 className="text-lg font-semibold">{pokemon.name}</h3>
-						{pokemon.types && (
-							<div className="flex gap-1 mt-1">
-								{pokemon.types.map((type) => (
-									<Badge
-										key={type}
-										variant="secondary"
-										className={`${TYPE_COLORS[type]} text-white text-xs px-2 py-0`}
-									>
-										{type}
-									</Badge>
-								))}
-							</div>
-						)}
-					</div>
-				</div>
-
-				<div className="mb-3">
-					<div className="flex justify-between mb-1">
-						<span className="font-medium">HP:</span>
-						<span className="font-medium">
-							{currentHP}/{maxHP} ({Math.round(hpPercentage)}%)
-						</span>
-					</div>
-					<div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-						<div
-							className={`h-full ${hpColor} transition-all duration-300`}
-							style={{ width: `${hpPercentage}%` }}
-						/>
-					</div>
-				</div>
-
-				<div className="flex flex-col gap-1 mb-1">
-					{item && (
-						<div className="flex justify-between">
-							<span className="font-medium">Item:</span>
-
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span className="font-medium">{item.name}</span>
-								</TooltipTrigger>
-								<TooltipContent>
-									<span>{item.desc}</span>
-								</TooltipContent>
-							</Tooltip>
-						</div>
-					)}
-					{ability && (
-						<div className="flex justify-between">
-							<span className="font-medium">Ability:</span>
-
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span className="font-medium">{ability.name}</span>
-								</TooltipTrigger>
-								<TooltipContent>
-									<span>{ability.desc}</span>
-								</TooltipContent>
-							</Tooltip>
-						</div>
-					)}
-				</div>
-
-				<div className="flex flex-wrap gap-2">
-					{status && (
-						<div
-							className={`inline-block px-2 py-1 rounded text-xs font-semibold ${getStatusClass(status)}`}
-						>
-							{getStatusName(status)}
-						</div>
-					)}
-				</div>
-			</div>
-		);
-	};
-
-	// Render available moves for a player
-	const renderMoves = (player: "p1" | "p2") => {
-		const request = battleState[player].request;
-		if (!request || !request.active || !request.active[0]) {
-			return <div>No moves available</div>;
-		}
-
-		const active = request.active[0];
-		const moves = active.moves || [];
-		const selectedMove = battleState[player].selectedMove;
-
-		return (
-			<div className="mt-5">
-				<h4 className="text-md font-semibold mb-3">Available Moves</h4>
-				<div className="grid grid-cols-2 gap-2">
-					{moves.map((move, index) => {
-						// Get move details if battleEngine is available
-						const moveData = battleEngineRef.current?.getMoveData(move.id);
-						if (!moveData) {
-							return null;
+		const initializeBattle = () => {
+			const engine = battleManager.getBattle(battleId);
+			if (!engine) {
+				if (retryCount < maxRetries) {
+					retryTimeout = setTimeout(() => {
+						if (mounted) {
+							setRetryCount((prev) => prev + 1);
+							initializeBattle();
 						}
+					}, 1000);
+					return;
+				}
+				setError(`Battle with ID ${battleId} not found or has ended.`);
+				setViewState(null);
+				return;
+			}
 
-						return (
-							<BattleMoveButton
-								key={move.id}
-								moveDetails={move}
-								// @ts-ignore - The type error is due to a mismatch between @pkmn/sim and @pkmn/dex-types
-								moveData={moveData}
-								isSelected={selectedMove === index + 1}
-								onClick={() => {
-									if (player === "p1") {
-										handleP1MoveSelect(index + 1);
-									} else {
-										handleP2MoveSelect(index + 1);
-									}
-								}}
-								disabled={move.disabled}
-							/>
-						);
-					})}
-				</div>
-			</div>
-		);
+			if (!mounted) return;
+			battleEngineRef.current = engine;
+
+			// Initial state fetch
+			setViewState({
+				battle: engine.getBattle(),
+				logs: [...engine.getLogs()],
+				p1Request: engine.getP1Request(),
+				p2Request: engine.getP2Request(),
+			});
+			setError(null);
+			setRetryCount(0);
+
+			const unsubscribe = engine.on("stateUpdate", (state) => {
+				if (mounted) {
+					setViewState(state);
+				}
+			});
+			const unsubscribeEnd = engine.on("battleEnd", ({ winner, state }) => {
+				if (mounted) {
+					console.log(`Battle ${battleId} ended. Winner: ${winner}`);
+
+					// Ensure the final state with winner/ended status is set
+					setViewState((prev) => ({
+						...(prev ?? {
+							battle: null,
+							logs: [],
+							p1Request: null,
+							p2Request: null,
+						}),
+						battle: state,
+					}));
+				}
+			});
+			return () => {
+				unsubscribe();
+				unsubscribeEnd();
+			};
+		};
+
+		const cleanup = initializeBattle();
+		return () => {
+			mounted = false;
+			if (retryTimeout) clearTimeout(retryTimeout);
+			if (cleanup) cleanup();
+		};
+	}, [battleId, retryCount]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Trigger scroll on log changes
+	useEffect(() => {
+		if (logScrollAreaRef.current) {
+			const scrollElement = logScrollAreaRef.current.querySelector(
+				"[data-radix-scroll-area-viewport]",
+			);
+			if (scrollElement) {
+				scrollElement.scrollTop = scrollElement.scrollHeight;
+			}
+		}
+	}, [viewState?.logs]);
+
+	// Handle player decisions (forward to engine)
+	const handlePlayerDecision = (
+		player: "p1" | "p2",
+		decision: PlayerDecision | null,
+	) => {
+		if (!battleEngineRef.current || viewState?.battle?.ended) return;
+
+		const otherPlayer = player === "p1" ? "p2" : "p1";
+		const currentDecision = decision;
+		const otherDecision = selectedDecisions[otherPlayer];
+
+		// Update the local state for visual feedback first
+		setSelectedDecisions((prev) => ({
+			...prev,
+			[player]: currentDecision,
+		}));
+
+		// Check if the other player has an active request needing a decision
+		const otherPlayerNeedsDecision =
+			otherPlayer === "p1"
+				? viewState?.p1Request && !viewState.p1Request.wait
+				: viewState?.p2Request && !viewState.p2Request.wait;
+
+		// Case 1: Current player made a decision, and the other player DOES NOT need to decide
+		if (currentDecision !== null && !otherPlayerNeedsDecision) {
+			console.log(`Sending immediate decision for ${player}:`, currentDecision);
+			battleEngineRef.current.processPlayerDecision(player, currentDecision);
+			// Clear this player's selection immediately after sending
+			setSelectedDecisions((prev) => ({ ...prev, [player]: null }));
+			// The other player's selection should already be null if they didn't need to decide
+			if (otherDecision !== null) {
+				console.warn(
+					`Cleared unexpected stored decision for ${otherPlayer} during immediate send.`,
+				);
+				setSelectedDecisions((prev) => ({ ...prev, [otherPlayer]: null }));
+			}
+		}
+		// Case 2: Current player made a decision, AND the other player ALSO needs to decide (and has already decided)
+		else if (
+			currentDecision !== null &&
+			otherPlayerNeedsDecision &&
+			otherDecision !== null
+		) {
+			console.log(
+				`Sending simultaneous decisions: P1=${
+					player === "p1" ? currentDecision : otherDecision
+				}, P2=${player === "p2" ? currentDecision : otherDecision}`,
+			);
+			// Send decisions (order might matter slightly depending on speed ties, but engine handles it)
+			if (player === "p1") {
+				battleEngineRef.current.processPlayerDecision("p1", currentDecision);
+				battleEngineRef.current.processPlayerDecision("p2", otherDecision);
+			} else {
+				battleEngineRef.current.processPlayerDecision("p1", otherDecision);
+				battleEngineRef.current.processPlayerDecision("p2", currentDecision);
+			}
+			// Reset selections after sending both
+			setSelectedDecisions({ p1: null, p2: null });
+		}
+		// Case 3: Current player made a decision, but the other player still needs to decide (and hasn't)
+		// Do nothing here, just wait for the other player's decision (which will trigger Case 2)
+
+		// Case 4: Player cancelled their decision (decision is null)
+		// The state is already updated via setSelectedDecisions above. No engine call needed.
+		else if (currentDecision === null) {
+			console.log(`Player ${player} cancelled selection.`);
+		}
 	};
 
 	// Render battle logs
 	const renderBattleLogs = () => {
+		if (!viewState?.logs) return null;
+
+		// Try to get turn from battle object, default to 0
+		const turn = viewState.battle?.turn ?? 0;
+
 		return (
-			<div className="h-full flex flex-col">
-				<h3 className="text-lg font-semibold mb-3">Battle Log</h3>
-				<pre className="text-sm font-medium bg-green-100 border-green-200">
-					{format}
-				</pre>
-				<div className="flex-1 overflow-y-auto max-h-[400px] p-2.5 border border-gray-200 rounded bg-gray-50">
-					{battleState.logs.map((log: string, index: number) => (
-						<div
-							key={`log-${index}-${Date.now()}`}
-							className="mb-1"
-							// biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
-							dangerouslySetInnerHTML={{ __html: log }}
-						/>
-					))}
-				</div>
-			</div>
+			<Card className="h-full flex flex-col">
+				<CardHeader className="py-3 px-4 border-b">
+					<CardTitle className="text-lg font-semibold">Battle Log</CardTitle>
+				</CardHeader>
+				<CardContent className="p-0 flex-grow overflow-hidden">
+					<ScrollArea
+						className="h-[calc(100vh-250px)] p-4"
+						ref={logScrollAreaRef}
+					>
+						{viewState.logs.length === 0 && (
+							<p className="text-center text-muted-foreground italic mt-4">
+								Battle starting...
+							</p>
+						)}
+						{viewState.logs.map((log, index) => {
+							// Use turn and index for a more stable key during re-renders
+							const key = `${turn}-${index}-${log.substring(0, 10)}`;
+							return (
+								<div
+									key={key}
+									className="mb-1 last:mb-0 protocol-line text-sm leading-normal [&_b]:font-semibold"
+									// biome-ignore lint/security/noDangerouslySetInnerHtml: Sanitized by LogFormatter
+									dangerouslySetInnerHTML={{ __html: log }}
+								/>
+							);
+						})}
+					</ScrollArea>
+				</CardContent>
+			</Card>
 		);
 	};
 
+	// Error and Loading States
+	if (error) {
+		return (
+			<Card className="mx-auto max-w-md mt-10">
+				<CardContent className="p-6">
+					<div className="text-destructive text-center font-medium">
+						{error}
+						{retryCount < maxRetries && (
+							<div className="mt-2 text-sm text-muted-foreground">
+								Attempting to reconnect... (Attempt {retryCount + 1}/
+								{maxRetries})
+							</div>
+						)}
+					</div>
+				</CardContent>
+			</Card>
+		);
+	}
+
+	if (!viewState?.battle) {
+		return (
+			<Card className="mx-auto max-w-xs mt-10">
+				<CardContent className="p-6">
+					<div className="text-center text-muted-foreground animate-pulse">
+						Loading Battle...
+					</div>
+				</CardContent>
+			</Card>
+		);
+	}
+
+	// Get the battle object with extended type assertion for winner/ended
+	const battle = viewState.battle as Battle & {
+		winner?: string | null;
+		ended?: boolean;
+	};
+
 	return (
-		<div className="flex flex-col w-full max-w-7xl mx-auto p-6 bg-gradient-to-b from-gray-50 to-gray-100 rounded-xl shadow-lg">
-			<div className="text-center mb-6">
-				<div className="flex justify-center items-center gap-4 mt-2">
-					<Badge
-						variant="outline"
-						className="px-4 py-1.5 text-sm font-medium transition-colors"
-					>
-						Turn: {battleState.turn}
-					</Badge>
-					<Badge
-						variant="secondary"
-						className="px-4 py-1.5 text-sm font-medium"
-					>
-						{battleState.status}
-					</Badge>
-					{battleState.weather !== "none" && (
-						<Badge
-							variant="outline"
-							className="px-4 py-1.5 text-sm font-medium bg-blue-100 border-blue-200"
-						>
-							{battleState.weather}
-						</Badge>
-					)}
-				</div>
-			</div>
+		<div className="flex flex-col w-full max-w-7xl mx-auto space-y-4">
+			{/* Battle End State Banner */}
+			{(battle.winner || battle.ended) && !battle.winner && (
+				<Card className="bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30">
+					<CardContent className="flex items-center justify-center p-3">
+						{battle.winner ? (
+							<Badge
+								variant="default"
+								className="text-base px-4 py-1 bg-green-600 hover:bg-green-700 text-white"
+							>
+								Winner: {battle.winner}
+							</Badge>
+						) : (
+							<Badge variant="secondary" className="text-base px-4 py-1">
+								Result: Tie
+							</Badge>
+						)}
+					</CardContent>
+				</Card>
+			)}
 
-			<div className="grid grid-cols-1 lg:grid-cols-[1.2fr_2fr_1.2fr] gap-6">
-				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-					<h3 className="text-xl font-bold mb-4 text-indigo-800">{p1Name}</h3>
-					{renderPokemonInfo("p1")}
-					{renderMoves("p1")}
+			{/* Main Battle Grid */}
+			<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+				{/* Player 1 */}
+				<div className="col-span-1">
+					<PlayerDisplay
+						player="p1"
+						battle={battle}
+						request={viewState.p1Request}
+						generation={generation}
+						engine={battleEngineRef.current}
+						selectedDecision={selectedDecisions.p1}
+						onDecision={handlePlayerDecision}
+					/>
 				</div>
 
-				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-					{renderBattleLogs()}
-				</div>
+				{/* Battle Log */}
+				<div className="col-span-1 h-full">{renderBattleLogs()}</div>
 
-				<div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-					<h3 className="text-xl font-bold mb-4 text-indigo-800">{p2Name}</h3>
-					{renderPokemonInfo("p2")}
-					{renderMoves("p2")}
+				{/* Player 2 */}
+				<div className="col-span-1">
+					<PlayerDisplay
+						player="p2"
+						battle={battle}
+						request={viewState.p2Request}
+						generation={generation}
+						engine={battleEngineRef.current}
+						selectedDecision={selectedDecisions.p2}
+						onDecision={handlePlayerDecision}
+					/>
 				</div>
 			</div>
 		</div>

@@ -9,7 +9,6 @@ import {
 	CardFooter,
 } from "@/components/ui/card";
 import { ArrowRight, Swords, Dices } from "lucide-react";
-import { GenerationSelector } from "@/components/GenerationSelector";
 
 export default function Home() {
 	return (
@@ -20,16 +19,11 @@ export default function Home() {
 						Pokemon Battling
 					</h1>
 					<p className="text-xl text-muted-foreground max-w-2xl">
-						Experience thrilling Pokemon battles! Choose your Pokemon and moves,
-						or jump straight into a random battle for quick action.
+						Experience thrilling Pokemon battles!
 					</p>
-					<div className="flex items-center gap-4">
-						<p className="text-muted-foreground">Select Pokemon Generation:</p>
-						<GenerationSelector />
-					</div>
 				</div>
 
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+				<div className="grid grid-cols-1 gap-6 max-w-4xl mx-auto">
 					<Card className="flex flex-col">
 						<CardHeader>
 							<div className="flex items-center gap-2">
@@ -39,8 +33,8 @@ export default function Home() {
 						</CardHeader>
 						<CardContent>
 							<p className="text-muted-foreground">
-								Jump straight into action with randomly selected Pokemon and
-								moves for both you and your opponent.
+								Jump straight into action with randomly selected Pokemon, and
+								see how they battle it out!
 							</p>
 						</CardContent>
 						<CardFooter className="mt-auto">
@@ -54,49 +48,7 @@ export default function Home() {
 							</Button>
 						</CardFooter>
 					</Card>
-
-					<Card className="flex flex-col">
-						<CardHeader>
-							<div className="flex items-center gap-2">
-								<Swords className="w-6 h-6" />
-								<h2 className="text-2xl font-semibold">Choose & Battle</h2>
-							</div>
-						</CardHeader>
-						<CardContent>
-							<p className="text-muted-foreground">
-								Select your favorite Pokemon from the Pokedex, get assigned
-								random moves, and battle against a computer opponent.
-							</p>
-						</CardContent>
-						<CardFooter className="mt-auto">
-							<Button className="w-full" size="lg" variant="outline" asChild>
-								<Link
-									href="/pkmn-select"
-									className="flex items-center justify-center gap-2"
-								>
-									Start Battle <ArrowRight className="w-4 h-4" />
-								</Link>
-							</Button>
-						</CardFooter>
-					</Card>
 				</div>
-
-				<Card className="mt-12 max-w-4xl mx-auto">
-					<CardHeader>
-						<h2 className="text-2xl font-semibold">How It Works</h2>
-					</CardHeader>
-					<CardContent>
-						<ol className="list-decimal pl-5 space-y-3 text-lg">
-							<li>
-								Select your Pokemon from the Pokedex (or get a random one)
-							</li>
-							<li>Get assigned 4 random moves from that Pokemon's learnset</li>
-							<li>
-								<b>FIGHT!</b>
-							</li>
-						</ol>
-					</CardContent>
-				</Card>
 			</div>
 
 			<footer className="fixed bottom-0 w-full border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

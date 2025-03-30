@@ -1,7 +1,6 @@
-import { Generations, type Specie } from "@pkmn/data";
+import { Generations, type Specie, type GenerationNum } from "@pkmn/data";
 import { Dex } from "@pkmn/dex";
 import type { PokemonData } from "../components/PokemonSelector";
-import { useSettings } from "@/app/store/settings";
 import { getGraphics } from "@/lib/constants";
 import type { Pokemon } from "@pkmn/client";
 import { Sprites } from "@pkmn/img";
@@ -12,10 +11,12 @@ export type PokemonWithMoves = {
 };
 
 /**
- * Generate a random Pokemon
+ * Generate a random Pokemon for a specific generation
+ * @param generation - The generation number
  */
-export async function getRandomPokemon(): Promise<PokemonWithMoves> {
-	const { generation } = useSettings.getState();
+export async function getRandomPokemon(
+	generation: GenerationNum,
+): Promise<PokemonWithMoves> {
 	const gens = new Generations(Dex);
 	const gen = gens.get(generation);
 
@@ -27,7 +28,7 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 	const randomPokemon = allPokemon[randomIndex];
 
 	// Get random moves for this Pokemon
-	const moves = await getRandomMovesForPokemon(randomPokemon);
+	const moves = await getRandomMovesForPokemon(randomPokemon, generation);
 
 	return {
 		// @ts-ignore
@@ -37,13 +38,15 @@ export async function getRandomPokemon(): Promise<PokemonWithMoves> {
 }
 
 /**
- * Get random moves for a specific Pokemon
+ * Get random moves for a specific Pokemon in a specific generation
+ * @param pokemon - The Pokemon species
+ * @param generation - The generation number
  */
 export async function getRandomMovesForPokemon(
 	pokemon: Specie,
+	generation: GenerationNum,
 ): Promise<string[]> {
 	try {
-		const { generation } = useSettings.getState();
 		const gens = new Generations(Dex);
 		const gen = gens.get(generation);
 
@@ -91,12 +94,47 @@ export async function getRandomMovesForPokemon(
 	}
 }
 
-export const getSprite = (pokemon: Pokemon, player: "p1" | "p2") => {
-	const { generation } = useSettings.getState();
-	return Sprites.getPokemon(pokemon.speciesForme, {
-		side: player,
-		gender: pokemon.gender || undefined,
-		gen: getGraphics(generation),
+/**
+ * Get the sprite URL for a Pokémon
+ */
+export function getSprite(
+	pokemon: Pokemon,
+	player: "p1" | "p2",
+	generation: GenerationNum,
+): string {
+	const species = pokemon.speciesForme.toLowerCase();
+	const graphics = getGraphics(generation);
+
+	const options = {
+		gen: graphics,
 		shiny: pokemon.shiny,
-	});
+		gender: pokemon.gender,
+		side: player,
+	};
+
+	return Sprites.getPokemon(species, options).url;
+}
+
+/**
+ * Parse a Pokémon's HP and status information
+ */
+export function parseCondition(pokemon: Pokemon) {
+	return {
+		currentHP: pokemon.hp || 0,
+		maxHP: pokemon.maxhp || 0,
+		status: pokemon.status || null,
+	};
+}
+
+/**
+ * Get the appropriate Tailwind CSS color class for an HP percentage
+ */
+export function getHPColor(hpPercentage: number): string {
+	if (hpPercentage > 50) {
+		return "bg-emerald-500";
+	}
+	if (hpPercentage > 20) {
+		return "bg-yellow-500";
+	}
+	return "bg-red-500";
 }

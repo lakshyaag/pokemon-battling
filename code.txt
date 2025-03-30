@@ -1,0 +1,2318 @@
+app/globals.css
+---
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.704 0.04 256.788);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
+}
+
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.129 0.042 264.695);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.129 0.042 264.695);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.984 0.003 247.858);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.279 0.041 260.031);
+  --input: oklch(0.279 0.041 260.031);
+  --ring: oklch(0.446 0.043 257.281);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(0.279 0.041 260.031);
+  --sidebar-ring: oklch(0.446 0.043 257.281);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+
+---
+app/layout.tsx
+---
+import { TooltipProvider } from "@/components/ui/tooltip";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({
+	variable: "--font-geist-sans",
+	subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+	variable: "--font-geist-mono",
+	subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+	title: "Pokemon Battling",
+	description: "A simple app to battle Pokemon",
+	authors: {
+		name: "Lakshya Agarwal",
+		url: "https://github.com/lakshyaag",
+	},
+};
+
+export default function RootLayout({
+	children,
+}: Readonly<{
+	children: React.ReactNode;
+}>) {
+	return (
+		<html lang="en">
+			<body
+				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+			>
+				<TooltipProvider>{children}</TooltipProvider>
+			</body>
+		</html>
+	);
+}
+
+
+---
+app/page.tsx
+---
+"use client";
+
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardHeader,
+	CardContent,
+	CardFooter,
+} from "@/components/ui/card";
+import { ArrowRight, Swords, Dices } from "lucide-react";
+
+export default function Home() {
+	return (
+		<div className="min-h-screen bg-background">
+			<div className="container mx-auto px-4 py-16">
+				<div className="flex flex-col items-center text-center space-y-6 mb-12">
+					<h1 className="text-5xl font-bold tracking-tight">
+						Pokemon Battling
+					</h1>
+					<p className="text-xl text-muted-foreground max-w-2xl">
+						Experience thrilling Pokemon battles! Choose your Pokemon and moves,
+						or jump straight into a random battle for quick action.
+					</p>
+				</div>
+
+				<div className="grid grid-cols-1 gap-6 max-w-4xl mx-auto">
+					<Card className="flex flex-col">
+						<CardHeader>
+							<div className="flex items-center gap-2">
+								<Dices className="w-6 h-6" />
+								<h2 className="text-2xl font-semibold">Quick Random Battle</h2>
+							</div>
+						</CardHeader>
+						<CardContent>
+							<p className="text-muted-foreground">
+								Jump straight into action with randomly selected Pokemon and
+								moves for both you and your opponent.
+							</p>
+						</CardContent>
+						<CardFooter className="mt-auto">
+							<Button variant="default" className="w-full" size="lg" asChild>
+								<Link
+									href="/battle"
+									className="flex items-center justify-center gap-2"
+								>
+									Random Battle <ArrowRight className="w-4 h-4" />
+								</Link>
+							</Button>
+						</CardFooter>
+					</Card>
+				</div>
+			</div>
+
+			<footer className="fixed bottom-0 w-full border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+				<div className="container flex h-14 items-center justify-center text-sm">
+					<p className="text-muted-foreground">
+						Built with @pkmn/ps libraries. Made with ❤️ by{" "}
+						<Link
+							href="https://github.com/lakshyaag"
+							className="underline hover:text-primary"
+						>
+							Lakshya Agarwal
+						</Link>
+					</p>
+				</div>
+			</footer>
+		</div>
+	);
+}
+
+
+---
+app/battle/page.tsx
+---
+"use client";
+
+import React, { useState, useEffect } from "react";
+import BattleView from "@/components/BattleView";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { battleManager } from "@/services/battle-manager-instance";
+import { useSettings } from "@/store/settings";
+import { getFormat } from "@/lib/constants";
+
+export default function BattlePage() {
+	const { generation } = useSettings();
+	const router = useRouter();
+	const [battleId, setBattleId] = useState<string | null>(null);
+
+	useEffect(() => {
+		// Only create a new battle if we don't have one
+		if (!battleId) {
+			const id = crypto.randomUUID();
+			const format = getFormat(generation);
+			const p1Name = "Player 1";
+			const p2Name = "Player 2";
+
+			try {
+				const battle = battleManager.createBattle(id, {
+					format,
+					p1Name,
+					p2Name,
+				});
+
+				// Subscribe to battle end to handle cleanup
+				battle.on("battleEnd", () => {
+					// Keep the battle around for a minute to allow for viewing results
+					setTimeout(() => {
+						battleManager.removeBattle(id);
+					}, 60000);
+				});
+
+				battleManager.startBattle(id);
+				setBattleId(id);
+			} catch (error) {
+				console.error("Error creating battle:", error);
+				router.push("/");
+			}
+		}
+
+		// Cleanup only when explicitly navigating away
+		return () => {
+			if (battleId) {
+				const battle = battleManager.getBattle(battleId);
+				if (battle) {
+					battleManager.removeBattle(battleId);
+				}
+			}
+		};
+	}, [generation, router, battleId]);
+
+	const handleReturnHome = () => {
+		if (battleId) {
+			battleManager.removeBattle(battleId);
+		}
+		router.push("/");
+	};
+
+	if (!battleId) {
+		return <div>Loading Battle...</div>;
+	}
+
+	return (
+		<div className="container mx-auto py-8">
+			<div className="mb-6 flex justify-between items-center">
+				<h1 className="text-3xl font-bold">Pokémon Battle</h1>
+				<div className="flex gap-4">
+					<Button
+						variant="outline"
+						onClick={handleReturnHome}
+					>
+						Return to Home
+					</Button>
+				</div>
+			</div>
+			<BattleView battleId={battleId} />
+		</div>
+	);
+}
+
+
+---
+app/utils/pokemonUtils.ts
+---
+import { Generations, type Specie, type GenerationNum } from "@pkmn/data";
+import { Dex } from "@pkmn/dex";
+import type { PokemonData } from "../components/PokemonSelector";
+import { getGraphics } from "@/lib/constants";
+import type { Pokemon } from "@pkmn/client";
+import { Sprites } from "@pkmn/img";
+
+export type PokemonWithMoves = {
+	pokemon: PokemonData;
+	moves: string[];
+};
+
+/**
+ * Generate a random Pokemon for a specific generation
+ * @param generation - The generation number
+ */
+export async function getRandomPokemon(
+	generation: GenerationNum,
+): Promise<PokemonWithMoves> {
+	const gens = new Generations(Dex);
+	const gen = gens.get(generation);
+
+	// Get all Pokemon
+	const allPokemon = Array.from(gen.species);
+
+	// Select a random Pokemon
+	const randomIndex = Math.floor(Math.random() * allPokemon.length);
+	const randomPokemon = allPokemon[randomIndex];
+
+	// Get random moves for this Pokemon
+	const moves = await getRandomMovesForPokemon(randomPokemon, generation);
+
+	return {
+		// @ts-ignore
+		pokemon: randomPokemon,
+		moves,
+	};
+}
+
+/**
+ * Get random moves for a specific Pokemon in a specific generation
+ * @param pokemon - The Pokemon species
+ * @param generation - The generation number
+ */
+export async function getRandomMovesForPokemon(
+	pokemon: Specie,
+	generation: GenerationNum,
+): Promise<string[]> {
+	try {
+		const gens = new Generations(Dex);
+		const gen = gens.get(generation);
+
+		// Wait for the learnsets data to load
+		const learnsets = await gen.learnsets.get(pokemon.id);
+
+		if (!learnsets) {
+			throw new Error(`No learnset data found for ${pokemon.name}`);
+		}
+
+		// Get all moves for this Pokemon
+		const availableMoves: string[] = [];
+
+		for (const moveId in learnsets.learnset) {
+			const sources = learnsets.learnset[moveId];
+			if (sources.some((source) => source.startsWith(generation.toString()))) {
+				// Get the actual move object to display proper name
+				const move = gen.moves.get(moveId);
+				if (move) {
+					availableMoves.push(move.name);
+				}
+			}
+		}
+
+		// If we have less than 4 moves, use all of them
+		// Otherwise, randomly select 4 moves
+		let selectedMoves: string[];
+		if (availableMoves.length <= 4) {
+			selectedMoves = [...availableMoves];
+		} else {
+			selectedMoves = [];
+			const movesCopy = [...availableMoves];
+
+			while (selectedMoves.length < 4 && movesCopy.length > 0) {
+				const randomIndex = Math.floor(Math.random() * movesCopy.length);
+				selectedMoves.push(movesCopy[randomIndex]);
+				movesCopy.splice(randomIndex, 1);
+			}
+		}
+
+		return selectedMoves;
+	} catch (error) {
+		console.error("Error getting moves:", error);
+		return [];
+	}
+}
+
+/**
+ * Get the sprite URL for a Pokémon
+ */
+export function getSprite(
+	pokemon: Pokemon,
+	player: "p1" | "p2",
+	generation: GenerationNum,
+): string {
+	const species = pokemon.speciesForme.toLowerCase();
+	const graphics = getGraphics(generation);
+
+	const options = {
+		gen: graphics,
+		shiny: pokemon.shiny,
+		gender: pokemon.gender,
+		side: player,
+	};
+
+	return Sprites.getPokemon(species, options).url;
+}
+
+/**
+ * Parse a Pokémon's HP and status information
+ */
+export function parseCondition(pokemon: Pokemon) {
+	return {
+		currentHP: pokemon.hp || 0,
+		maxHP: pokemon.maxhp || 0,
+		status: pokemon.status || null,
+	};
+}
+
+/**
+ * Get the appropriate Tailwind CSS color class for an HP percentage
+ */
+export function getHPColor(hpPercentage: number): string {
+	if (hpPercentage > 50) {
+		return "bg-emerald-500";
+	}
+	if (hpPercentage > 20) {
+		return "bg-yellow-500";
+	}
+	return "bg-red-500";
+}
+
+
+---
+app/components/BattleMoveButton.tsx
+---
+import React from "react";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
+import { TypeBadge } from "./ui/type-badge";
+import { cva } from "class-variance-authority";
+import type { TypeName } from "@pkmn/types";
+import type { Move } from "@pkmn/dex";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Separator } from "./ui/separator";
+
+interface BattleMoveButtonProps {
+	move: Move;
+	pp: number;
+	maxPp: number;
+	disabled?: boolean;
+	isDisabled?: boolean;
+	isSelected?: boolean;
+	onClick: () => void;
+}
+
+// Variants for button background based on type
+const moveButtonVariants = cva(
+	"relative w-full min-h-[5rem] h-full p-3 flex flex-col justify-between overflow-hidden transition-all duration-200 rounded-lg border shadow-sm hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+	{
+		variants: {
+			type: {
+				normal:
+					"bg-gray-100/50 hover:bg-gray-100 border-gray-200 dark:bg-gray-800/30 dark:hover:bg-gray-800/60 dark:border-gray-700",
+				fire: "bg-red-100/50 hover:bg-red-100 border-red-200 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:border-red-800/50",
+				water:
+					"bg-blue-100/50 hover:bg-blue-100 border-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:border-blue-800/50",
+				electric:
+					"bg-yellow-100/50 hover:bg-yellow-100 border-yellow-200 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/40 dark:border-yellow-800/50",
+				grass:
+					"bg-emerald-100/50 hover:bg-emerald-100 border-emerald-200 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 dark:border-emerald-800/50",
+				ice: "bg-cyan-100/50 hover:bg-cyan-100 border-cyan-200 dark:bg-cyan-900/20 dark:hover:bg-cyan-900/40 dark:border-cyan-800/50",
+				fighting:
+					"bg-red-200/50 hover:bg-red-200 border-red-300 dark:bg-red-950/20 dark:hover:bg-red-950/40 dark:border-red-800/50",
+				poison:
+					"bg-purple-100/50 hover:bg-purple-100 border-purple-200 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 dark:border-purple-800/50",
+				ground:
+					"bg-amber-100/50 hover:bg-amber-100 border-amber-200 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 dark:border-amber-800/50",
+				flying:
+					"bg-sky-100/50 hover:bg-sky-100 border-sky-200 dark:bg-sky-900/20 dark:hover:bg-sky-900/40 dark:border-sky-800/50",
+				psychic:
+					"bg-pink-100/50 hover:bg-pink-100 border-pink-200 dark:bg-pink-900/20 dark:hover:bg-pink-900/40 dark:border-pink-800/50",
+				bug: "bg-lime-100/50 hover:bg-lime-100 border-lime-200 dark:bg-lime-900/20 dark:hover:bg-lime-900/40 dark:border-lime-800/50",
+				rock: "bg-stone-100/50 hover:bg-stone-100 border-stone-200 dark:bg-stone-900/20 dark:hover:bg-stone-900/40 dark:border-stone-800/50",
+				ghost:
+					"bg-purple-200/50 hover:bg-purple-200 border-purple-300 dark:bg-purple-950/20 dark:hover:bg-purple-950/40 dark:border-purple-800/50",
+				dragon:
+					"bg-violet-100/50 hover:bg-violet-100 border-violet-200 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 dark:border-violet-800/50",
+				dark: "bg-neutral-200/50 hover:bg-neutral-200 border-neutral-300 dark:bg-neutral-900/20 dark:hover:bg-neutral-900/40 dark:border-neutral-700",
+				steel:
+					"bg-slate-100/50 hover:bg-slate-100 border-slate-200 dark:bg-slate-800/20 dark:hover:bg-slate-800/40 dark:border-slate-700",
+				fairy:
+					"bg-pink-100/50 hover:bg-pink-100 border-pink-200 dark:bg-pink-900/20 dark:hover:bg-pink-900/40 dark:border-pink-800/50",
+				unknown:
+					"bg-gray-100/50 hover:bg-gray-100 border-gray-200 dark:bg-gray-800/30 dark:hover:bg-gray-800/60 dark:border-gray-700",
+			},
+		},
+		defaultVariants: {
+			type: "unknown",
+		},
+	},
+);
+
+/**
+ * Button component for displaying and selecting a Pokémon move
+ */
+export default function BattleMoveButton({
+	move,
+	pp,
+	maxPp,
+	disabled,
+	isDisabled,
+	isSelected,
+	onClick,
+}: BattleMoveButtonProps) {
+	const isButtonDisabled = disabled || isDisabled || pp <= 0;
+	const typeName = (move.type?.toLowerCase() || "unknown") as
+		| Lowercase<TypeName>
+		| "unknown";
+
+	return (
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					variant="ghost"
+					className={cn(
+						moveButtonVariants({
+							type: typeName as Lowercase<TypeName>,
+						}),
+						isButtonDisabled &&
+							"opacity-60 cursor-not-allowed hover:bg-inherit",
+						isSelected && "ring-2 ring-primary ring-offset-2 dark:ring-offset-background",
+						"text-left",
+					)}
+					disabled={isButtonDisabled}
+					onClick={onClick}
+				>
+					<div className="flex flex-col w-full h-full gap-1">
+						<div className="flex items-center justify-center">
+							<span className="font-semibold text-base text-foreground">
+								{move.name}
+							</span>
+						</div>
+						<div className="flex items-center justify-between mt-auto">
+							<TypeBadge type={move.type} className="flex-shrink-0" />
+							<span className="font-medium">
+								{pp}/{maxPp}
+							</span>
+						</div>
+					</div>
+					{isDisabled && (
+						<div className="absolute inset-0 bg-black/5 dark:bg-white/5 flex items-center justify-center rounded-lg">
+							<span className="text-xs text-destructive font-medium bg-background/80 px-1.5 py-0.5 rounded border border-destructive/30">
+								Disabled
+							</span>
+						</div>
+					)}
+				</Button>
+			</TooltipTrigger>
+			<TooltipContent className="w-64 p-3 bg-background text-foreground shadow-sm opacity-90">
+				<div className="space-y-2">
+					<div className="flex justify-between items-center">
+						<span className="font-semibold text-base">{move.name}</span>
+						<TypeBadge type={move.type} />
+					</div>
+					<Separator />
+					<p className="text-sm text-muted-foreground leading-relaxed">
+						{move.shortDesc || move.desc || "No description available."}
+					</p>
+					<div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground pt-1">
+						<div>
+							Power:{" "}
+							<span className="font-medium text-foreground">
+								{move.basePower || "-"}
+							</span>
+						</div>
+						<div>
+							Acc:{" "}
+							<span className="font-medium text-foreground">
+								{move.accuracy === true ? "∞" : move.accuracy || "-"}
+							</span>
+						</div>
+						<div>
+							PP:{" "}
+							<span className="font-medium">
+								{pp}/{maxPp}
+							</span>
+						</div>
+					</div>
+					{move.category && (
+						<div className="text-xs text-muted-foreground">
+							Category:{" "}
+							<span className="font-medium text-foreground">
+								{move.category}
+							</span>
+						</div>
+					)}
+					{isDisabled && (
+						<p className="text-xs text-destructive font-semibold pt-1">
+							Move is currently disabled.
+						</p>
+					)}
+				</div>
+			</TooltipContent>
+		</Tooltip>
+	);
+}
+
+
+---
+app/components/BattleView.tsx
+---
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import type { BattleState, PlayerRequest, PlayerDecision } from "../services/battle-types";
+import type { Battle } from "@pkmn/client";
+import type { BattleEngine } from "../services/battle-engine";
+import { Badge } from "./ui/badge";
+import { battleManager } from "@/services/battle-manager-instance";
+import { useSettings } from "@/store/settings";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { ScrollArea } from "./ui/scroll-area";
+import PlayerDisplay from "./PlayerDisplay";
+
+// Add this type to handle battle logs safely
+type BattleLog = {
+	id: string;
+	html: string;
+};
+
+interface BattleViewProps {
+	battleId: string;
+}
+
+/**
+ * Component for displaying and interacting with a Pokémon battle
+ */
+export default function BattleView({ battleId }: BattleViewProps) {
+	const battleEngineRef = useRef<BattleEngine | null>(null);
+	const { generation } = useSettings();
+	const [viewState, setViewState] = useState<BattleState | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [retryCount, setRetryCount] = useState(0);
+	const maxRetries = 3;
+	const logScrollAreaRef = useRef<HTMLDivElement>(null);
+	const [selectedDecisions, setSelectedDecisions] = useState<{
+		p1: PlayerDecision | null;
+		p2: PlayerDecision | null;
+	}>({
+		p1: null,
+		p2: null,
+	});
+
+	// Effect for initializing battle and subscribing to updates
+	useEffect(() => {
+		let retryTimeout: NodeJS.Timeout;
+		let mounted = true;
+
+		const initializeBattle = () => {
+			const engine = battleManager.getBattle(battleId);
+			if (!engine) {
+				if (retryCount < maxRetries) {
+					retryTimeout = setTimeout(() => {
+						if (mounted) {
+							setRetryCount((prev) => prev + 1);
+							initializeBattle();
+						}
+					}, 1000);
+					return;
+				}
+				setError(`Battle with ID ${battleId} not found or has ended.`);
+				setViewState(null);
+				return;
+			}
+
+			if (!mounted) return;
+			battleEngineRef.current = engine;
+
+			// Initial state fetch
+			setViewState({
+				battle: engine.getBattle(),
+				logs: [...engine.getLogs()],
+				p1Request: engine.getP1Request(),
+				p2Request: engine.getP2Request(),
+			});
+			setError(null);
+			setRetryCount(0);
+
+			const unsubscribe = engine.on("stateUpdate", (state) => {
+				if (mounted) {
+					setViewState(state);
+				}
+			});
+			const unsubscribeEnd = engine.on("battleEnd", ({ winner, state }) => {
+				if (mounted) {
+					console.log(`Battle ${battleId} ended. Winner: ${winner}`);
+					// Ensure the final state with winner/ended status is set
+					setViewState((prev) => ({
+						...(prev ?? {
+							battle: null,
+							logs: [],
+							p1Request: null,
+							p2Request: null,
+						}),
+						battle: state,
+					}));
+				}
+			});
+			return () => {
+				unsubscribe();
+				unsubscribeEnd();
+			};
+		};
+
+		const cleanup = initializeBattle();
+		return () => {
+			mounted = false;
+			if (retryTimeout) clearTimeout(retryTimeout);
+			if (cleanup) cleanup();
+		};
+	}, [battleId, retryCount]);
+
+	// Effect for auto-scrolling logs
+	useEffect(() => {
+		if (logScrollAreaRef.current) {
+			const scrollElement = logScrollAreaRef.current.querySelector(
+				"[data-radix-scroll-area-viewport]",
+			);
+			if (scrollElement) {
+				scrollElement.scrollTop = scrollElement.scrollHeight;
+			}
+		}
+	}, [viewState?.logs]); // Trigger scroll on log changes
+
+	// Handle player decisions (forward to engine)
+	const handlePlayerDecision = (
+		player: "p1" | "p2",
+		decision: PlayerDecision | null,
+	) => {
+		if (!battleEngineRef.current || viewState?.battle?.ended) return;
+
+		setSelectedDecisions((prev) => ({
+			...prev,
+			[player]: decision,
+		}));
+
+		// Only execute the turn if both players have made their decisions
+		if (decision !== null && player === "p2" && selectedDecisions.p1 !== null) {
+			// Execute both decisions
+			battleEngineRef.current.processPlayerDecision("p1", selectedDecisions.p1);
+			battleEngineRef.current.processPlayerDecision("p2", decision);
+			// Reset selections
+			setSelectedDecisions({ p1: null, p2: null });
+		} else if (decision !== null && player === "p1" && selectedDecisions.p2 !== null) {
+			// Execute both decisions
+			battleEngineRef.current.processPlayerDecision("p1", decision);
+			battleEngineRef.current.processPlayerDecision("p2", selectedDecisions.p2);
+			// Reset selections
+			setSelectedDecisions({ p1: null, p2: null });
+		}
+	};
+
+	// Render battle logs
+	const renderBattleLogs = () => {
+		if (!viewState?.logs) return null;
+
+		// Try to get turn from battle object, default to 0
+		const turn = viewState.battle?.turn ?? 0;
+
+		return (
+			<Card className="h-full flex flex-col">
+				<CardHeader className="py-3 px-4 border-b">
+					<CardTitle className="text-lg font-semibold">Battle Log</CardTitle>
+				</CardHeader>
+				<CardContent className="p-0 flex-grow overflow-hidden">
+					<ScrollArea
+						className="h-[calc(100vh-250px)] p-4"
+						ref={logScrollAreaRef}
+					>
+						{viewState.logs.length === 0 && (
+							<p className="text-center text-muted-foreground italic mt-4">
+								Battle starting...
+							</p>
+						)}
+						{viewState.logs.map((log, index) => {
+							// Use turn and index for a more stable key during re-renders
+							const key = `${turn}-${index}-${log.substring(0, 10)}`;
+							return (
+								<div
+									key={key}
+									className="mb-1 last:mb-0 protocol-line text-sm leading-normal [&_b]:font-semibold"
+									// biome-ignore lint/security/noDangerouslySetInnerHtml: Sanitized by LogFormatter
+									dangerouslySetInnerHTML={{ __html: log }}
+								/>
+							);
+						})}
+					</ScrollArea>
+				</CardContent>
+			</Card>
+		);
+	};
+
+	// Error and Loading States
+	if (error) {
+		return (
+			<Card className="mx-auto max-w-md mt-10">
+				<CardContent className="p-6">
+					<div className="text-destructive text-center font-medium">
+						{error}
+						{retryCount < maxRetries && (
+							<div className="mt-2 text-sm text-muted-foreground">
+								Attempting to reconnect... (Attempt {retryCount + 1}/
+								{maxRetries})
+							</div>
+						)}
+					</div>
+				</CardContent>
+			</Card>
+		);
+	}
+
+	if (!viewState?.battle) {
+		return (
+			<Card className="mx-auto max-w-xs mt-10">
+				<CardContent className="p-6">
+					<div className="text-center text-muted-foreground animate-pulse">
+						Loading Battle...
+					</div>
+				</CardContent>
+			</Card>
+		);
+	}
+
+	// Get the battle object with extended type assertion for winner/ended
+	const battle = viewState.battle as Battle & {
+		winner?: string | null;
+		ended?: boolean;
+	};
+
+	console.log(battle);
+
+	return (
+		<div className="flex flex-col w-full max-w-7xl mx-auto space-y-4">
+			{/* Battle End State Banner */}
+			{(battle.winner || battle.ended) && !battle.winner && (
+				<Card className="bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30">
+					<CardContent className="flex items-center justify-center p-3">
+						{battle.winner ? (
+							<Badge
+								variant="default"
+								className="text-base px-4 py-1 bg-green-600 hover:bg-green-700 text-white"
+							>
+								Winner: {battle.winner}
+							</Badge>
+						) : (
+							<Badge variant="secondary" className="text-base px-4 py-1">
+								Result: Tie
+							</Badge>
+						)}
+					</CardContent>
+				</Card>
+			)}
+
+			{/* Main Battle Grid */}
+			<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+				{/* Player 1 */}
+				<div className="col-span-1">
+					<PlayerDisplay
+						player="p1"
+						battle={battle}
+						request={viewState.p1Request}
+						generation={generation}
+						engine={battleEngineRef.current}
+						selectedDecision={selectedDecisions.p1}
+						onDecision={handlePlayerDecision}
+					/>
+				</div>
+
+				{/* Battle Log */}
+				<div className="col-span-1 h-full">{renderBattleLogs()}</div>
+
+				{/* Player 2 */}
+				<div className="col-span-1">
+					<PlayerDisplay
+						player="p2"
+						battle={battle}
+						request={viewState.p2Request}
+						generation={generation}
+						engine={battleEngineRef.current}
+						selectedDecision={selectedDecisions.p2}
+						onDecision={handlePlayerDecision}
+					/>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+
+---
+app/components/PlayerDisplay.tsx
+---
+import React from "react";
+import type { Pokemon, Battle } from "@pkmn/client";
+import type { PlayerRequest, PlayerDecision } from "@/services/battle-types";
+import type { BattleEngine } from "@/services/battle-engine";
+import type { GenerationNum } from "@pkmn/types";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { TypeBadge } from "./ui/type-badge";
+import BattleMoveButton from "./BattleMoveButton";
+import SwitchButton from "./SwitchButton";
+import { getSprite, parseCondition, getHPColor } from "@/utils/pokemonUtils";
+import { getStatusClass, getStatusName } from "@/lib/utils";
+import { Button } from "./ui/button";
+
+interface PlayerDisplayProps {
+	player: "p1" | "p2";
+	battle: Battle | null;
+	request: PlayerRequest | null;
+	generation: GenerationNum;
+	engine: BattleEngine | null;
+	selectedDecision: PlayerDecision | null;
+	onDecision: (player: "p1" | "p2", decision: PlayerDecision | null) => void;
+}
+
+export default function PlayerDisplay({
+	player,
+	battle,
+	request,
+	generation,
+	engine,
+	selectedDecision,
+	onDecision,
+}: PlayerDisplayProps) {
+	if (!battle || !engine) {
+		return (
+			<Card className="w-full">
+				<CardContent className="pt-6 text-center text-muted-foreground">
+					Loading player...
+				</CardContent>
+			</Card>
+		);
+	}
+
+	const pokemon = battle[player].active[0];
+	// Get request data even if pokemon exists, for item/ability/moves
+	const pokemonFromRequest = request?.side.pokemon.find((p) => p.active);
+
+	const renderInfo = () => {
+		if (!pokemon) {
+			return (
+				<div className="text-center text-muted-foreground italic h-32 flex items-center justify-center">
+					No active Pokémon
+				</div>
+			);
+		}
+
+		const spriteUrl = getSprite(pokemon, player, generation);
+		// Use request for item/ability as it's more reliable during updates
+		const itemData = pokemonFromRequest?.item
+			? engine.getItem(pokemonFromRequest.item)
+			: null;
+		const abilityData = pokemonFromRequest?.baseAbility
+			? engine.getAbility(pokemonFromRequest.baseAbility)
+			: null;
+
+		const { currentHP, maxHP, status } = parseCondition(pokemon);
+		const hpPercentage = maxHP > 0 ? (currentHP / maxHP) * 100 : 0;
+		const hpColor = getHPColor(hpPercentage);
+
+		return (
+			<div className="flex flex-col items-center space-y-3">
+				<div className="relative w-32 h-32">
+					<img
+						src={spriteUrl}
+						alt={pokemon.name}
+						className="w-full h-full object-contain pixelated"
+					/>
+					{status && (
+						<Badge
+							variant="secondary"
+							className={`absolute bottom-0 right-0 text-xs px-1.5 py-0.5 ${getStatusClass(status)}`}
+						>
+							{getStatusName(status)}
+						</Badge>
+					)}
+				</div>
+				<div className="text-center w-full">
+					<h3 className="text-lg font-bold mb-1">{pokemon.name}</h3>
+					<div className="flex gap-1.5 justify-center mb-2">
+						{pokemon.types.map((type) => (
+							<TypeBadge key={type} type={type} />
+						))}
+					</div>
+					<div className="space-y-1">
+						<div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+							<div
+								className={`h-full ${hpColor} rounded-full transition-all duration-300 ease-in-out`}
+								style={{ width: `${hpPercentage}%` }}
+							/>
+						</div>
+						<p className="text-xs font-medium text-muted-foreground">
+							{currentHP} / {maxHP} HP
+						</p>
+					</div>
+					{itemData && (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<p className="text-xs mt-1.5 cursor-help text-muted-foreground">
+									Item: <span className="font-medium">{itemData.name}</span>
+								</p>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p className="max-w-xs text-sm">
+									{itemData.desc || "No description."}
+								</p>
+							</TooltipContent>
+						</Tooltip>
+					)}
+					{abilityData && (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<p className="text-xs mt-0.5 cursor-help text-muted-foreground">
+									Ability:{" "}
+									<span className="font-medium">{abilityData.name}</span>
+								</p>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p className="max-w-xs text-sm">
+									{abilityData.desc || "No description."}
+								</p>
+							</TooltipContent>
+						</Tooltip>
+					)}
+				</div>
+			</div>
+		);
+	};
+
+	const renderActionSection = () => {
+		// Check if a switch is forced for the first active slot
+		const needsToSwitch = request?.forceSwitch?.[0] === true;
+		// Check if moves are available (request exists, not waiting, has moves)
+		const canMove = request && !request.wait && request.active?.[0]?.moves && request.active[0].moves.length > 0;
+		// Check if trapped
+		const isTrapped = request?.active?.[0]?.trapped === true;
+		// Check if can switch voluntarily
+		const canSwitch = !isTrapped && request?.active?.[0]?.canSwitch !== false;
+
+		const renderSwitchOptions = (showTitle = true) => {
+			if (!request) return null;
+			
+			const switchOptions = request.side.pokemon.filter(
+				(p) => !p.active && p.condition !== "0 fnt" && !p.reviving
+			);
+
+			if (switchOptions.length === 0) {
+				return (
+					<div className="text-center p-4 text-destructive">
+						No Pokémon available to switch in!
+					</div>
+				);
+			}
+
+			return (
+				<div className="space-y-2">
+					{showTitle && (
+						<h4 className="font-semibold text-center mb-2">
+							{needsToSwitch ? (
+								<span className="text-destructive">Must Switch!</span>
+							) : (
+								"Switch to"
+							)}
+						</h4>
+					)}
+					{switchOptions.map((pokemonInfo) => {
+						// Find the original index in the full request.side.pokemon array
+						const originalIndex = request.side.pokemon.findIndex(
+							(p) => p.ident === pokemonInfo.ident
+						);
+						const switchIndex = originalIndex + 1; // 1-based index for protocol
+
+						if (originalIndex === -1) return null;
+
+						const isSelected = 
+							selectedDecision?.type === "switch" && 
+							selectedDecision.pokemonIndex === switchIndex;
+
+						return (
+							<SwitchButton
+								key={pokemonInfo.ident}
+								pokemonInfo={pokemonInfo}
+								onClick={() => {
+									if (isSelected) {
+										onDecision(player, null);
+									} else {
+										onDecision(player, {
+											type: "switch",
+											pokemonIndex: switchIndex,
+										});
+									}
+								}}
+								disabled={isTrapped}
+							/>
+						);
+					})}
+				</div>
+			);
+		};
+
+		// If forced to switch, only show switch options
+		if (needsToSwitch) {
+			return renderSwitchOptions();
+		}
+
+		// Show moves and optional switch button
+		if (canMove) {
+			const moves = request!.active![0].moves;
+			const isSelectedMove = selectedDecision?.type === "move";
+			const isSelectedSwitch = selectedDecision?.type === "switch";
+			const [showingSwitchOptions, setShowingSwitchOptions] = React.useState(false);
+			
+			return (
+				<div className="space-y-3">
+					{!showingSwitchOptions ? (
+						<>
+							<div className="grid grid-cols-2 gap-2.5">
+								{moves.map((moveInfo, index) => {
+									const moveData = engine.getMoveData(moveInfo.id);
+									if (!moveData) return null;
+
+									const isDisabled = moveInfo.disabled;
+									const isButtonDisabled = isDisabled || moveInfo.pp <= 0;
+
+									return (
+										<BattleMoveButton
+											key={`${moveInfo.id}-${index}`}
+											move={moveData}
+											pp={moveInfo.pp}
+											maxPp={moveInfo.maxpp}
+											disabled={isButtonDisabled || isSelectedSwitch}
+											isDisabled={isDisabled}
+											isSelected={isSelectedMove && selectedDecision.moveIndex === index + 1}
+											onClick={() => {
+												if (isButtonDisabled) return;
+												if (isSelectedMove && selectedDecision.moveIndex === index + 1) {
+													onDecision(player, null);
+												} else {
+													onDecision(player, {
+														type: "move",
+														moveIndex: index + 1,
+													});
+												}
+											}}
+										/>
+									);
+								})}
+							</div>
+							{canSwitch && (
+								<div className="flex justify-end gap-2">
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => setShowingSwitchOptions(true)}
+										disabled={isSelectedMove}
+									>
+										Switch Pokémon
+									</Button>
+									{selectedDecision && (
+										<Button
+											variant="ghost"
+											size="sm"
+											className="text-destructive hover:text-destructive/90"
+											onClick={() => onDecision(player, null)}
+										>
+											Cancel Selection
+										</Button>
+									)}
+								</div>
+							)}
+						</>
+					) : (
+						<>
+							{renderSwitchOptions(false)}
+							<div className="flex justify-end gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setShowingSwitchOptions(false)}
+								>
+									Show Moves
+								</Button>
+								{selectedDecision && (
+									<Button
+										variant="ghost"
+										size="sm"
+										className="text-destructive hover:text-destructive/90"
+										onClick={() => onDecision(player, null)}
+									>
+										Cancel Selection
+									</Button>
+								)}
+							</div>
+						</>
+					)}
+				</div>
+			);
+		}
+
+		if (request?.wait) {
+			return (
+				<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
+					Waiting for opponent...
+				</div>
+			);
+		}
+
+		return (
+			<div className="text-muted-foreground italic text-center p-4 h-[12rem] flex items-center justify-center">
+				No action required.
+			</div>
+		);
+	};
+
+	return (
+		<div className="flex flex-col space-y-4 w-full">
+			<Card>
+				<CardContent className="pt-5 pb-4">{renderInfo()}</CardContent>
+			</Card>
+			<Card>
+				<CardHeader className="py-2 px-4 border-b">
+					<CardTitle className="text-base font-medium">
+						{request?.forceSwitch?.[0] ? "Choose Switch" : "Choose Action"}
+					</CardTitle>
+				</CardHeader>
+				<CardContent className="pt-4 pb-4">{renderActionSection()}</CardContent>
+			</Card>
+		</div>
+	);
+}
+
+
+---
+app/components/SwitchButton.tsx
+---
+import React from "react";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
+import { Badge } from "./ui/badge";
+import { parseCondition, getHPColor } from "@/utils/pokemonUtils";
+import { getStatusClass, getStatusName } from "@/lib/utils";
+import { Sprites } from "@pkmn/img";
+import { useSettings } from "@/store/settings";
+import { getGraphics } from "@/lib/constants";
+import type { PlayerRequest } from "@/services/battle-types";
+import type { GenderName } from "@pkmn/types";
+
+type PokemonInfo = NonNullable<PlayerRequest["side"]["pokemon"][number]>;
+
+interface SwitchButtonProps {
+	pokemonInfo: PokemonInfo;
+	onClick: () => void;
+	disabled?: boolean;
+}
+
+export default function SwitchButton({
+	pokemonInfo,
+	onClick,
+	disabled,
+}: SwitchButtonProps) {
+	const { generation } = useSettings();
+	const graphics = getGraphics(generation);
+
+	// Extract basic info
+
+	console.log(pokemonInfo);
+	const name = pokemonInfo.details.split(",")[0].replace(/-.+$/, "");
+	const level = pokemonInfo.details.match(/, L(\d+)/)?.[1] || "100";
+	const gender = pokemonInfo.details.includes(", M")
+		? ("M" as GenderName)
+		: pokemonInfo.details.includes(", F")
+			? ("F" as GenderName)
+			: undefined;
+	const shiny = pokemonInfo.details.includes(", shiny");
+
+	// Parse condition string like "100/100" or "0 fnt"
+	const [currentHPStr, maxHPStr] = pokemonInfo.condition
+		.split("/")
+		.map((s) => s.trim());
+	const currentHP = Number.parseInt(currentHPStr, 10) || 0;
+	let maxHP = Number.parseInt(maxHPStr?.split(" ")[0], 10) || 0;
+	const status = pokemonInfo.condition.split(" ")[1]?.toLowerCase() || null;
+
+	// Infer maxHP if missing
+	if (maxHP === 0 && currentHP > 0) maxHP = currentHP;
+	if (maxHP === 0 && currentHP === 0) maxHP = 100;
+
+	const hpPercentage = maxHP > 0 ? (currentHP / maxHP) * 100 : 0;
+	const hpColor = getHPColor(hpPercentage);
+
+	// Get sprite URL
+	const spriteUrl = Sprites.getPokemon(name.toLowerCase(), {
+		gen: graphics,
+		shiny,
+		gender,
+	}).url;
+
+	return (
+		<Button
+			variant="outline"
+			className={cn(
+				"h-auto w-full p-3 flex items-center justify-start gap-3 text-left border rounded-lg shadow-sm hover:bg-accent/50 dark:hover:bg-accent/10",
+				disabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
+			)}
+			onClick={onClick}
+			disabled={disabled}
+		>
+			<img
+				src={spriteUrl}
+				alt={name}
+				className="w-10 h-10 object-contain pixelated flex-shrink-0 bg-slate-100 dark:bg-slate-800 rounded-full"
+				loading="lazy"
+			/>
+			<div className="flex-grow space-y-1">
+				<div className="flex justify-between items-center">
+					<span className="font-semibold text-sm">{name}</span>
+					{level && <span className="text-xs text-muted-foreground">Lv. {level}</span>}
+					{status && status !== "fnt" && (
+						<Badge
+							variant="secondary"
+							className={`text-xs px-1 py-0 ${getStatusClass(status)}`}
+						>
+							{getStatusName(status)}
+						</Badge>
+					)}
+				</div>
+				<div className="h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+					<div
+						className={`h-full ${hpColor} rounded-full`}
+						style={{ width: `${hpPercentage}%` }}
+					/>
+				</div>
+				<p className="text-xs text-muted-foreground">
+					{currentHP} / {maxHP} HP
+				</p>
+			</div>
+		</Button>
+	);
+}
+
+
+---
+app/services/battle-engine.ts
+---
+import { Battle } from "@pkmn/client";
+import { Generations } from "@pkmn/data";
+import {
+	type ArgName,
+	type ArgType,
+	type BattleArgsKWArgType,
+	Protocol,
+} from "@pkmn/protocol";
+import { TeamGenerators } from "@pkmn/randoms";
+import {
+	BattleStreams,
+	Teams as DTeams,
+	Dex,
+	type ModdedDex,
+	PRNG,
+} from "@pkmn/sim";
+import type { ObjectReadWriteStream } from "@pkmn/streams";
+import { LogFormatter } from "@pkmn/view";
+import {
+	BattleEventEmitter,
+	type BattleEventMap,
+} from "./battle-event-emitter";
+import type {
+	BattleState,
+	BattleOptions,
+	PlayerDecision,
+	PlayerRequest,
+} from "./battle-types";
+import { ManualPlayer } from "./player";
+
+/**
+ * Core battle engine that manages the battle state and logic
+ */
+export class BattleEngine {
+	private battle: Battle;
+	private streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
+	private p1Stream: ObjectReadWriteStream<string>;
+	private p2Stream: ObjectReadWriteStream<string>;
+	private formatter: LogFormatter;
+	private prng: PRNG;
+	private dex: ModdedDex;
+	private gens: Generations;
+	private format: string;
+	private eventEmitter: BattleEventEmitter;
+	private p1: ManualPlayer;
+	private p2: ManualPlayer;
+	private logs: string[] = [];
+	private p1Request: PlayerRequest | null = null;
+	private p2Request: PlayerRequest | null = null;
+
+	/**
+	 * Create a battle engine
+	 * @param options - The battle options
+	 */
+	constructor(options: BattleOptions) {
+		this.format = options.format || "gen3randombattle";
+		this.prng = new PRNG();
+		this.dex = Dex.forFormat(this.format);
+		// @ts-ignore
+		this.gens = new Generations(Dex);
+		this.eventEmitter = new BattleEventEmitter();
+
+		// Set up team generators
+		DTeams.setGeneratorFactory(TeamGenerators);
+
+		// Create battle streams
+		this.streams = BattleStreams.getPlayerStreams(
+			new BattleStreams.BattleStream(),
+		);
+		this.p1Stream = this.streams.p1;
+		this.p2Stream = this.streams.p2;
+
+		// Create battle instance
+		this.battle = new Battle(this.gens);
+
+		// Create formatter
+		this.formatter = new LogFormatter("p1", this.battle);
+
+		// Initialize players
+		this.p1 = new ManualPlayer(
+			this.p1Stream,
+			false,
+			options.p1Name,
+			(request: PlayerRequest) => this.handlePlayerRequest("p1", request),
+		);
+
+		this.p2 = new ManualPlayer(
+			this.p2Stream,
+			false,
+			options.p2Name,
+			(request) => this.handlePlayerRequest("p2", request),
+		);
+
+		// Set up onBattleUpdate callback if provided
+		if (options.onBattleUpdate) {
+			this.on("stateUpdate", (state) => {
+				if (options.onBattleUpdate) {
+					options.onBattleUpdate(state);
+				}
+			});
+		}
+
+		// Start listening to the omniscient stream
+		this.startBattleStream();
+	}
+
+	/**
+	 * Start the battle stream
+	 */
+	private async startBattleStream(): Promise<void> {
+		try {
+			for await (const chunk of this.streams.omniscient) {
+				for (const line of chunk.split("\n")) {
+					const { args, kwArgs } = Protocol.parseBattleLine(line);
+					const html = this.formatter.formatHTML(args, kwArgs);
+					
+					// Update battle state
+					this.battle.add(args, kwArgs);
+
+					if (html) {
+						this.logs.push(html);
+					}
+				}
+
+				// Update battle
+				this.battle.update();
+
+				// Emit state update event
+				this.eventEmitter.emit("stateUpdate", {
+					battle: this.battle,
+					logs: [...this.logs],
+					p1Request: this.p1Request,
+					p2Request: this.p2Request
+				});
+			}
+		} catch (error) {
+			console.error("Battle stream error:", error);
+			this.eventEmitter.emit("battleEnd", { winner: 'error', state: this.battle });
+		}
+	}
+
+	/**
+	 * Handle a player request
+	 * @param player - The player ID
+	 * @param request - The request
+	 */
+	private handlePlayerRequest(
+		player: "p1" | "p2",
+		request: PlayerRequest,
+	): void {
+		if (player === "p1") {
+			this.p1Request = request;
+		} else {
+			this.p2Request = request;
+		}
+
+		this.eventEmitter.emit("playerRequest", { player, request });
+		this.eventEmitter.emit("stateUpdate", {
+			battle: this.battle,
+			logs: [...this.logs],
+			p1Request: this.p1Request,
+			p2Request: this.p2Request
+		});
+	}
+
+	/**
+	 * Start the battle
+	 * @param p1Team - Optional team for player 1
+	 * @param p2Team - Optional team for player 2
+	 */
+	startBattle(p1Team?: string, p2Team?: string): void {
+		const spec = { formatid: this.format };
+
+		// Generate random teams if needed
+		const createTeam = () => {
+			// Use the built-in team generator
+			try {
+				const generator = TeamGenerators.getTeamGenerator(
+					this.format,
+					this.prng,
+				);
+				return DTeams.export(generator.getTeam());
+			} catch (error) {
+				console.error("Error generating random team:", error);
+				return null;
+			}
+		};
+
+		const p1TeamFinal = p1Team || createTeam();
+		const p2TeamFinal = p2Team || createTeam();
+
+		const p1spec = {
+			name: this.p1.playerName,
+			team: p1TeamFinal ? DTeams.import(p1TeamFinal) : null,
+		};
+		const p2spec = {
+			name: this.p2.playerName,
+			team: p2TeamFinal ? DTeams.import(p2TeamFinal) : null,
+		};
+
+		// Start the battle
+		void this.streams.omniscient.write(`>start ${JSON.stringify(spec)}
+>player p1 ${JSON.stringify(p1spec)}
+>player p2 ${JSON.stringify(p2spec)}`);
+
+		// Emit battle start event
+		this.eventEmitter.emit("battleStart", this.battle);
+	}
+
+	/**
+	 * Process a player's decision (move or switch)
+	 * @param player - The player ID
+	 * @param decision - The player's decision
+	 */
+	processPlayerDecision(player: "p1" | "p2", decision: PlayerDecision): void {
+		const playerStream = player === "p1" ? this.p1Stream : this.p2Stream;
+		let choice = "";
+
+		if (decision.type === "move") {
+			choice = `move ${decision.moveIndex}`;
+			this.eventEmitter.emit("playerMove", { player, moveIndex: decision.moveIndex });
+		} else if (decision.type === "switch") {
+			choice = `switch ${decision.pokemonIndex}`;
+			this.eventEmitter.emit("playerSwitch", { player, pokemonIndex: decision.pokemonIndex });
+		}
+
+		if (choice) {
+			// Clear the corresponding request as the player has made a choice
+			if (player === 'p1') this.p1Request = null;
+			else this.p2Request = null;
+
+			// Write the choice to the player's stream
+			try {
+				void playerStream.write(choice);
+			} catch (error) {
+				console.error(`Error writing choice for ${player}:`, error);
+			}
+
+			// Emit state update
+			this.eventEmitter.emit("stateUpdate", {
+				battle: this.battle,
+				logs: [...this.logs],
+				p1Request: this.p1Request,
+				p2Request: this.p2Request
+			});
+		} else {
+			console.warn(`Invalid decision type received for ${player}:`, decision);
+		}
+	}
+
+	/**
+	 * Get data for a move
+	 * @param moveId - The move ID
+	 * @returns The move data
+	 */
+	getMoveData(moveId: string) {
+		return this.dex.moves.get(moveId);
+	}
+
+	/**
+	 * Get data for an item
+	 * @param itemId - The item ID
+	 * @returns The item data
+	 */
+	getItem(itemId: string) {
+		return this.dex.items.get(itemId);
+	}
+
+	/**
+	 * Get data for an ability
+	 * @param abilityId - The ability ID
+	 * @returns The ability data
+	 */
+	getAbility(abilityId: string) {
+		return this.dex.abilities.get(abilityId);
+	}
+
+	/**
+	 * Subscribe to battle events with type safety
+	 * @param event - The event name
+	 * @param listener - The event listener function
+	 * @returns A function to unsubscribe
+	 */
+	on<K extends keyof BattleEventMap>(
+		event: K,
+		listener: (data: BattleEventMap[K]) => void,
+	): () => void {
+		return this.eventEmitter.on(event, listener);
+	}
+
+	getBattle(): Readonly<Battle> {
+		return this.battle;
+	}
+
+	getLogs(): ReadonlyArray<string> {
+		return this.logs;
+	}
+
+	getP1Request(): Readonly<PlayerRequest> | null {
+		return this.p1Request;
+	}
+
+	getP2Request(): Readonly<PlayerRequest> | null {
+		return this.p2Request;
+	}
+}
+
+
+---
+app/services/battle-event-emitter.ts
+---
+import type { Battle } from "@pkmn/client";
+import type { BattleState, PlayerRequest } from "./battle-types";
+
+/**
+ * Type-safe event map for battle events
+ */
+export interface BattleEventMap {
+    stateUpdate: BattleState;
+    battleStart: Battle;
+    battleEnd: { winner: string | null; state: Battle };
+    playerRequest: { player: "p1" | "p2"; request: PlayerRequest };
+    playerMove: { player: "p1" | "p2"; moveIndex: number };
+    playerSwitch: { player: "p1" | "p2"; pokemonIndex: number };
+}
+
+/**
+ * Simple event emitter for battle events
+ */
+export class BattleEventEmitter {
+    private events: { [K in keyof BattleEventMap]?: Array<(data: BattleEventMap[K]) => void> } = {};
+
+    /**
+     * Register an event listener with type safety
+     * @param event - The event name
+     * @param listener - The event listener function
+     * @returns A function to unsubscribe
+     */
+    on<K extends keyof BattleEventMap>(
+        event: K,
+        listener: (data: BattleEventMap[K]) => void
+    ): () => void {
+        if (!this.events[event]) {
+            this.events[event] = [];
+        }
+
+        this.events[event]?.push(listener);
+
+        return () => {
+            if (this.events[event]) {
+                this.events[event] = this.events[event]?.filter((l) => l !== listener);
+            }
+        };
+    }
+
+    /**
+     * Emit an event with type safety
+     * @param event - The event name
+     * @param data - The event data
+     */
+    emit<K extends keyof BattleEventMap>(event: K, data?: BattleEventMap[K]): void {
+        if (!this.events[event]) return;
+
+        for (const listener of this.events[event] || []) {
+            try {
+                listener(data as BattleEventMap[K]);
+            } catch (error) {
+                console.error(`Error in event listener for ${event}:`, error);
+            }
+        }
+    }
+
+    /**
+     * Remove all listeners for an event
+     * @param event - The event name (optional, if not provided, removes all listeners)
+     */
+    removeAllListeners(event?: keyof BattleEventMap): void {
+        if (event) {
+            this.events[event] = [];
+        } else {
+            this.events = {};
+        }
+    }
+} 
+
+---
+app/services/battle-manager-instance.ts
+---
+import { BattleManager } from './battle-manager';
+
+/**
+ * Singleton instance of BattleManager for centralized battle management
+ * This ensures all components use the same instance for managing battles
+ */
+export const battleManager = new BattleManager(); 
+
+---
+app/services/battle-manager.ts
+---
+import { BattleEngine } from "./battle-engine";
+import type { BattleOptions, BattleState, PlayerDecision } from "./battle-types";
+
+/**
+ * Class for managing Pokemon battles
+ */
+export class BattleManager {
+    private battles: Map<string, BattleEngine> = new Map();
+
+    /**
+     * Create a new battle
+     * @param battleId - Unique identifier for the battle
+     * @param options - Battle options
+     * @returns The created battle engine
+     */
+    createBattle(battleId: string, options: BattleOptions): BattleEngine {
+        // Check if battle with this ID already exists
+        if (this.battles.has(battleId)) {
+            throw new Error(`Battle with ID ${battleId} already exists`);
+        }
+
+        // Create new battle engine
+        const battleEngine = new BattleEngine(options);
+        
+        // Store in battles map
+        this.battles.set(battleId, battleEngine);
+        
+        // Set up cleanup when battle ends
+        battleEngine.on("battleEnd", () => {
+            // Keep the battle for a while before removing
+            setTimeout(() => {
+                this.removeBattle(battleId);
+            }, 60000); // 1 minute
+        });
+        
+        return battleEngine;
+    }
+
+    /**
+     * Get a battle by ID
+     * @param battleId - The battle ID
+     * @returns The battle engine or undefined if not found
+     */
+    getBattle(battleId: string): BattleEngine | undefined {
+        return this.battles.get(battleId);
+    }
+
+    /**
+     * Remove a battle
+     * @param battleId - The battle ID
+     * @returns True if battle was removed, false if not found
+     */
+    removeBattle(battleId: string): boolean {
+        return this.battles.delete(battleId);
+    }
+
+    /**
+     * Get all active battle IDs
+     * @returns Array of battle IDs
+     */
+    getActiveBattleIds(): string[] {
+        return Array.from(this.battles.keys());
+    }
+
+    /**
+     * Start a battle
+     * @param battleId - The battle ID
+     * @param p1Team - Player 1's team
+     * @param p2Team - Player 2's team
+     */
+    startBattle(battleId: string, p1Team?: string, p2Team?: string): void {
+        const battle = this.getBattle(battleId);
+        if (!battle) {
+            throw new Error(`Battle with ID ${battleId} not found`);
+        }
+        
+        battle.startBattle(p1Team, p2Team);
+    }
+
+    /**
+     * Make a move for a player
+     * @param battleId - The battle ID
+     * @param player - The player ("p1" or "p2")
+     * @param decision - The player's decision
+     */
+    makePlayerMove(
+        battleId: string, 
+        player: "p1" | "p2", 
+        decision: PlayerDecision
+    ): void {
+        const battle = this.getBattle(battleId);
+        if (!battle) {
+            throw new Error(`Battle with ID ${battleId} not found`);
+        }
+        
+        battle.processPlayerDecision(player, decision);
+    }
+} 
+
+---
+app/services/battle-types.ts
+---
+import type { Pokemon, Battle } from "@pkmn/client";
+
+/**
+ * Interface for move data
+ */
+export interface MoveData {
+    id: string;
+    move: string;
+    pp: number;
+    maxpp: number;
+    disabled?: boolean;
+}
+
+/**
+ * Interface for battle options
+ */
+export interface BattleOptions {
+    format: string;
+    p1Name: string;
+    p2Name: string;
+    p1Team?: string;
+    p2Team?: string;
+    onBattleUpdate?: (state: BattleState) => void;
+}
+
+/**
+ * Interface for player state in battle
+ */
+export interface PlayerState {
+    name?: string;
+    active: Pokemon | null;
+    team: Pokemon[];
+    request: PlayerRequest | null;
+    selectedMove: PlayerDecision | null;
+}
+
+/**
+ * Interface for battle state
+ */
+export interface BattleState {
+    battle: Battle;
+    logs: string[];
+    p1Request: PlayerRequest | null;
+    p2Request: PlayerRequest | null;
+}
+
+/**
+ * Interface for player request from the battle stream
+ */
+export interface PlayerRequest {
+    active?: {
+        moves: Array<{
+            id: string;
+            pp: number;
+            maxpp: number;
+            target: string;
+            disabled?: boolean;
+        }>;
+        trapped?: boolean;
+        maybeTrapped?: boolean;
+        canSwitch?: boolean | number[];
+    }[];
+    side: {
+        name: string;
+        id: string;
+        pokemon: Array<{
+            ident: string;
+            details: string;
+            condition: string;
+            active: boolean;
+            stats: {
+                atk: number;
+                def: number;
+                spa: number;
+                spd: number;
+                spe: number;
+            };
+            moves: string[];
+            baseAbility: string;
+            item: string;
+            pokeball: string;
+            ability: string;
+            reviving?: boolean;
+            fainted?: boolean;
+        }>;
+    };
+    forceSwitch?: boolean[];
+    wait?: boolean;
+    rqid?: number;
+}
+
+/**
+ * Interface for player move decisions
+ */
+export interface MoveDecision {
+    type: "move";
+    moveIndex: number;
+}
+
+/**
+ * Interface for player switch decision
+ */
+export interface SwitchDecision {
+    type: "switch";
+    pokemonIndex: number;
+}
+
+/**
+ * Union type for player decisions
+ */
+export type PlayerDecision = MoveDecision | SwitchDecision;
+
+/**
+ * Interface for battle turn result
+ */
+export interface TurnResult {
+    turn: number;
+    state: Readonly<BattleState>;
+}
+
+/**
+ * Interface for battle end result
+ */
+export interface BattleEndResult {
+    winner: string;
+    state: Readonly<BattleState>;
+}
+
+/**
+ * Interface for player move event
+ */
+export interface PlayerMoveEvent {
+    player: "p1" | "p2";
+    moveIndex: number;
+}
+
+/**
+ * Interface for player request event
+ */
+export interface PlayerRequestEvent {
+    player: "p1" | "p2";
+    request: PlayerRequest;
+} 
+
+---
+app/services/player.ts
+---
+import type { ObjectReadWriteStream } from "@pkmn/streams";
+import type { PlayerRequest } from "./battle-types";
+/**
+ * Class representing a manual player in a Pokémon battle
+ */
+export class ManualPlayer {
+    stream: ObjectReadWriteStream<string>;
+    log: string[] = [];
+    debug: boolean;
+    playerName: string;
+    onRequestReceived: (request: PlayerRequest) => void;
+
+    /**
+     * Create a manual player
+     * @param playerStream - The player's stream
+     * @param debug - Whether to enable debug logging
+     * @param playerName - The player's name
+     * @param onRequestReceived - Callback for when a request is received
+     */
+    constructor(
+        playerStream: ObjectReadWriteStream<string>,
+        debug = false,
+        playerName = "Unknown",
+        onRequestReceived: (request: PlayerRequest) => void = () => { },
+    ) {
+        this.stream = playerStream;
+        this.debug = debug;
+        this.playerName = playerName;
+        this.onRequestReceived = onRequestReceived;
+
+        void this.startListening();
+    }
+
+    /**
+     * Start listening to the stream
+     */
+    async startListening(): Promise<void> {
+        try {
+            for await (const chunk of this.stream) {
+                this.receive(chunk);
+            }
+        } catch (error) {
+            console.error(`${this.playerName} stream error:`, error);
+        }
+    }
+
+    /**
+     * Receive a chunk of data from the stream
+     * @param chunk - The data chunk
+     */
+    receive(chunk: string): void {
+        if (this.debug) console.log(`${this.playerName} received:`, chunk);
+
+        for (const line of chunk.split("\n")) {
+            this.receiveLine(line);
+        }
+    }
+
+    /**
+     * Receive a line of data
+     * @param line - The data line
+     */
+    receiveLine(line: string): void {
+        if (this.debug) console.log(`${this.playerName} line:`, line);
+        if (!line.startsWith("|")) return;
+
+        const [cmd, rest] =
+            line.slice(1).split("|", 1)[0] === ""
+                ? ["", line.slice(1)]
+                : [
+                    line.slice(1).split("|", 1)[0],
+                    line.slice(line.indexOf("|", 1) + 1),
+                ];
+
+        if (cmd === "request") {
+            try {
+                const request = JSON.parse(rest);
+                this.receiveRequest(request);
+            } catch (e) {
+                console.error(`${this.playerName} error parsing request:`, e, rest);
+            }
+            return;
+        }
+
+        if (cmd === "error") {
+            this.receiveError(new Error(rest));
+            return;
+        }
+
+        this.log.push(line);
+    }
+
+    /**
+     * Handle an error
+     * @param error - The error
+     */
+    receiveError(error: Error): void {
+        console.error(`${this.playerName} battle error:`, error);
+
+        // If we made an unavailable choice we will receive a followup request to
+        // allow us the opportunity to correct our decision.
+        if (error.message.startsWith("[Unavailable choice]")) return;
+    }
+
+    /**
+     * Handle a request
+     * @param request - The request
+     */
+    receiveRequest(request: PlayerRequest): void {
+        if (this.debug) console.log(`${this.playerName} received request:`, request);
+        this.onRequestReceived(request);
+    }
+
+    /**
+     * Make a move
+     * @param moveIndex - The move index (1-based)
+     */
+    makeMove(moveIndex: number): void {
+        this.makeChoice(`move ${moveIndex}`);
+    }
+
+    /**
+     * Make a choice
+     * @param choice - The choice string
+     */
+    makeChoice(choice: string): void {
+        console.log(`${this.playerName} making choice: ${choice}`);
+        try {
+            void this.stream.write(choice);
+        } catch (error) {
+            console.error(`${this.playerName} error making choice:`, error);
+        }
+    }
+}
+
+---
+app/store/settings.ts
+---
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { GenerationNum } from "@pkmn/types";
+
+interface SettingsState {
+    generation: GenerationNum;
+    setGeneration: (generation: GenerationNum) => void;
+}
+
+export const useSettings = create<SettingsState>()(
+    persist(
+        (set) => ({
+            generation: 3,
+            setGeneration: (generation) => set({ generation }),
+        }),
+        {
+            name: "pokemon-battle-settings",
+        }
+    )
+); 
+
+---
+lib/constants.ts
+---
+import type { GraphicsGen } from "@pkmn/img";
+import { PRNG } from "@pkmn/sim";
+import type { GenerationNum, TypeName } from "@pkmn/types";
+
+const SPRITES: { [gen in GenerationNum]: GraphicsGen } = {
+	1: "gen1rg",
+	2: "gen2g",
+	3: "gen3rs",
+	4: "gen4dp",
+	5: "gen5",
+	6: "ani",
+	7: "ani",
+	8: "ani",
+	9: "ani",
+};
+
+export const getFormat = (generation: GenerationNum) =>
+	`gen${generation}randombattle`;
+export const getGraphics = (generation: GenerationNum) => SPRITES[generation];
+
+// Type color mapping
+export const TYPE_COLORS: Partial<Record<TypeName, string>> = {
+	Normal: "bg-gray-400",
+	Fire: "bg-red-500",
+	Water: "bg-blue-500",
+	Electric: "bg-yellow-400",
+	Grass: "bg-green-500",
+	Ice: "bg-blue-200",
+	Fighting: "bg-red-700",
+	Poison: "bg-purple-500",
+	Ground: "bg-yellow-600",
+	Flying: "bg-indigo-400",
+	Psychic: "bg-pink-500",
+	Bug: "bg-lime-500",
+	Rock: "bg-yellow-800",
+	Ghost: "bg-purple-700",
+	Dragon: "bg-indigo-600",
+	Dark: "bg-gray-800",
+	Steel: "bg-gray-500",
+	Fairy: "bg-pink-300",
+};
+
+
+---
+lib/utils.ts
+---
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+
+export const getStatusClass = (status: string): string => {
+  // Get status class for styling
+  switch (status.toLowerCase()) {
+    case "par":
+      return "bg-yellow-400 text-yellow-900";
+    case "psn":
+    case "tox":
+      return "bg-purple-600 text-white";
+    case "brn":
+      return "bg-orange-500 text-white";
+    case "slp":
+      return "bg-gray-400 text-gray-900";
+    case "frz":
+      return "bg-blue-300 text-blue-900";
+    default:
+      return "bg-gray-600 text-white";
+  }
+};
+
+// Get status display name
+export const getStatusName = (status: string): string => {
+  switch (status.toLowerCase()) {
+    case "par":
+      return "Paralyzed";
+    case "psn":
+      return "Poisoned";
+    case "tox":
+      return "Badly Poisoned";
+    case "brn":
+      return "Burned";
+    case "slp":
+      return "Asleep";
+    case "frz":
+      return "Frozen";
+    default:
+      return status;
+  }
+};
+
+
+---
