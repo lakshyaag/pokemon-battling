@@ -1,35 +1,21 @@
-import type { Pokemon, Battle, ID } from "@pkmn/sim";
-import type { Args } from "@pkmn/protocol";
+import type { Pokemon, Battle } from "@pkmn/client";
 
 /**
- * Interface for move data in a request
+ * Interface for move data
  */
 export interface MoveData {
-	id: ID;
+	id: string;
 	move: string;
 	pp: number;
 	maxpp: number;
-	target?: string;
 	disabled?: boolean;
-}
-
-/**
- * Interface for battle options
- */
-export interface BattleOptions {
-	format: string;
-	p1Name: string;
-	p2Name: string;
-	p1Team?: string;
-	p2Team?: string;
-	debug?: boolean;
 }
 
 /**
  * Interface for player state in battle
  */
 export interface PlayerState {
-	name: string;
+	name?: string;
 	active: Pokemon | null;
 	team: Pokemon[];
 	request: PlayerRequest | null;
@@ -37,7 +23,7 @@ export interface PlayerState {
 }
 
 /**
- * Interface for battle state - mainly used for debugging and testing
+ * Interface for battle state
  */
 export interface BattleState {
 	battle: Battle;
@@ -46,14 +32,15 @@ export interface BattleState {
 	p2Request: PlayerRequest | null;
 }
 
+export type PlayerId = "p1" | "p2";
+
 /**
  * Interface for player request from the battle stream
  */
 export interface PlayerRequest {
-	active?: Array<{
+	active?: {
 		moves: Array<{
-			id: ID;
-			move: string;
+			id: string;
 			pp: number;
 			maxpp: number;
 			target: string;
@@ -62,10 +49,10 @@ export interface PlayerRequest {
 		trapped?: boolean;
 		maybeTrapped?: boolean;
 		canSwitch?: boolean | number[];
-	}>;
+	}[];
 	side: {
 		name: string;
-		id: ID;
+		id: string;
 		pokemon: Array<{
 			ident: string;
 			details: string;
@@ -78,11 +65,11 @@ export interface PlayerRequest {
 				spd: number;
 				spe: number;
 			};
-			moves: ID[];
-			baseAbility: ID;
-			item: ID;
+			moves: string[];
+			baseAbility: string;
+			item: string;
 			pokeball: string;
-			ability: ID;
+			ability: string;
 			reviving?: boolean;
 			fainted?: boolean;
 		}>;
@@ -98,7 +85,6 @@ export interface PlayerRequest {
 export interface MoveDecision {
 	type: "move";
 	moveIndex: number;
-	targetIndex?: number; // For moves that require a target
 }
 
 /**
@@ -115,26 +101,33 @@ export interface SwitchDecision {
 export type PlayerDecision = MoveDecision | SwitchDecision;
 
 /**
- * Type for protocol line handlers
+ * Interface for battle turn result
  */
-export type ProtocolLineHandler = (lines: string[]) => void;
+export interface TurnResult {
+	turn: number;
+	state: Readonly<BattleState>;
+}
 
 /**
- * Type for request handlers
+ * Interface for battle end result
  */
-export type RequestHandler = (request: PlayerRequest) => void;
+export interface BattleEndResult {
+	winner: string;
+	state: Readonly<BattleState>;
+}
 
 /**
- * Type for player identifiers
+ * Interface for player move event
  */
-export type PlayerId = "p1" | "p2";
+export interface PlayerMoveEvent {
+	player: "p1" | "p2";
+	moveIndex: number;
+}
 
 /**
- * Type for protocol line types
+ * Interface for player request event
  */
-export type ProtocolLineType = "omniscient" | PlayerId;
-
-/**
- * Type for battle protocol args from @pkmn/protocol
- */
-export type BattleProtocolArgs = Args;
+export interface PlayerRequestEvent {
+	player: "p1" | "p2";
+	request: PlayerRequest;
+}

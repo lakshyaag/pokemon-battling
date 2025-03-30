@@ -1,4 +1,4 @@
-import { Battle } from "@pkmn/sim";
+import { Battle, type ID } from "@pkmn/sim";
 import { Generations } from "@pkmn/data";
 import { Protocol } from "@pkmn/protocol";
 import { TeamGenerators } from "@pkmn/randoms";
@@ -10,7 +10,6 @@ import {
 	PRNG,
 } from "@pkmn/sim";
 import type { ObjectReadWriteStream } from "@pkmn/streams";
-import { LogFormatter } from "@pkmn/view";
 import {
 	BattleEventEmitter,
 	type BattleEventMap,
@@ -22,155 +21,141 @@ import type {
 } from "./battle-types";
 import { ManualPlayer } from "./player";
 
+export interface BattleProtocolEventMap extends Record<string, unknown> {
+	protocol: { type: "omniscient" | "p1" | "p2"; lines: string[] };
+	request: { player: "p1" | "p2"; request: PlayerRequest };
+	battleEnd: { winner: string | null };
+	battleStart: { battleId: string };
+}
+
 /**
- * Core battle engine that manages the battle state and logic
+ * Core battle engine that manages the battle state and logic, emitting protocol lines.
  */
 export class BattleEngine {
 	private battle: Battle;
 	private streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
 	private p1Stream: ObjectReadWriteStream<string>;
 	private p2Stream: ObjectReadWriteStream<string>;
-	private formatter: LogFormatter;
 	private prng: PRNG;
 	private dex: ModdedDex;
 	private gens: Generations;
-	private format: string;
-	private eventEmitter: BattleEventEmitter;
+	private format: ID;
+	private eventEmitter: BattleEventEmitter<BattleProtocolEventMap>;
 	private p1: ManualPlayer;
 	private p2: ManualPlayer;
-	private logs: string[] = [];
 	private p1Request: PlayerRequest | null = null;
 	private p2Request: PlayerRequest | null = null;
+	private battleId: string;
 
-	/**
-	 * Create a battle engine
-	 * @param options - The battle options
-	 */
-	constructor(options: BattleOptions) {
-		this.format = options.format || "gen3randombattle";
+	constructor(battleId: string, options: BattleOptions) {
+		this.battleId = battleId;
+		this.format = (options.format as ID) || ("gen3randombattle" as ID);
 		this.prng = new PRNG();
 		this.dex = Dex.forFormat(this.format);
-		// @ts-ignore
+		// @ts-ignore - Dex expects Dex | ModdedDex, Generations expects Dex
 		this.gens = new Generations(Dex);
-		this.eventEmitter = new BattleEventEmitter();
+		this.eventEmitter = new BattleEventEmitter<BattleProtocolEventMap>();
 
-		// Set up team generators
 		DTeams.setGeneratorFactory(TeamGenerators);
-
-		// Create battle streams
 		this.streams = BattleStreams.getPlayerStreams(
-			new BattleStreams.BattleStream(),
+			new BattleStreams.BattleStream({ debug: true }),
 		);
 		this.p1Stream = this.streams.p1;
 		this.p2Stream = this.streams.p2;
+		this.battle = new Battle({ formatid: this.format });
 
-		// Create battle instance
-		this.battle = new Battle(this.gens);
-
-		// Create formatter
-		this.formatter = new LogFormatter("p1", this.battle);
-
-		// Initialize players
 		this.p1 = new ManualPlayer(
 			this.p1Stream,
 			false,
 			options.p1Name,
 			(request: PlayerRequest) => this.handlePlayerRequest("p1", request),
+			(lines: string[]) => this.handlePlayerProtocol("p1", lines),
 		);
-
 		this.p2 = new ManualPlayer(
 			this.p2Stream,
 			false,
 			options.p2Name,
-			(request) => this.handlePlayerRequest("p2", request),
+			(request: PlayerRequest) => this.handlePlayerRequest("p2", request),
+			(lines: string[]) => this.handlePlayerProtocol("p2", lines),
 		);
 
-		// Set up onBattleUpdate callback if provided
-		if (options.onBattleUpdate) {
-			this.on("stateUpdate", (state) => {
-				if (options.onBattleUpdate) {
-					options.onBattleUpdate(state);
-				}
-			});
-		}
-
-		// Start listening to the omniscient stream
-		this.startBattleStream();
+		this.startOmniscientStream();
 	}
 
-	/**
-	 * Start the battle stream
-	 */
-	private async startBattleStream(): Promise<void> {
+	private async startOmniscientStream(): Promise<void> {
 		try {
 			for await (const chunk of this.streams.omniscient) {
-				for (const line of chunk.split("\n")) {
-					const { args, kwArgs } = Protocol.parseBattleLine(line);
-					const html = this.formatter.formatHTML(args, kwArgs);
+				const lines = chunk.split("\n").filter((line) => line.length > 0);
+				if (lines.length === 0) continue;
 
-					// Update battle state
-					this.battle.add(args, kwArgs);
-
-					if (html) {
-						this.logs.push(html);
+				// Process lines internally FIRST
+				for (const line of lines) {
+					try {
+						const { args, kwArgs } = Protocol.parseBattleLine(line);
+						// @ts-ignore - Protocol.parseBattleLine returns a compatible type but TypeScript can't infer it
+						this.battle.add(args, kwArgs);
+					} catch (e) {
+						console.error(
+							`[BattleEngine ${this.battleId}] Error parsing omni line: "${line}"`,
+							e,
+						);
+						this.eventEmitter.emit("protocol", {
+							type: "omniscient",
+							lines: [
+								`|error|[ProtocolParseError] ${e instanceof Error ? e.message : String(e)}`,
+							],
+						});
 					}
 				}
 
-				// Update battle
-				this.battle.update();
+				// Emit the raw lines for the clients
+				this.eventEmitter.emit("protocol", { type: "omniscient", lines });
 
-				// Emit state update event
-				this.eventEmitter.emit("stateUpdate", {
-					battle: this.battle,
-					logs: [...this.logs],
-					p1Request: this.p1Request,
-					p2Request: this.p2Request,
-				});
+				// Check for battle end condition after processing lines
+				if (this.battle.ended) {
+					console.log(
+						`[BattleEngine ${this.battleId}] Battle ended internally. Winner: ${this.battle.winner}`,
+					);
+					this.eventEmitter.emit("battleEnd", {
+						winner: this.battle.winner || null,
+					});
+					break;
+				}
 			}
+			console.log(
+				`[BattleEngine ${this.battleId}] Omniscient stream finished.`,
+			);
 		} catch (error) {
-			console.error("Battle stream error:", error);
+			console.error(
+				`[BattleEngine ${this.battleId}] Omniscient stream error:`,
+				error,
+			);
 			this.eventEmitter.emit("battleEnd", {
-				winner: "error",
-				state: this.battle,
+				winner: `error: ${error}`,
 			});
+		} finally {
+			this.destroy();
 		}
 	}
 
-	/**
-	 * Handle a player request
-	 * @param player - The player ID
-	 * @param request - The request
-	 */
+	private handlePlayerProtocol(player: "p1" | "p2", lines: string[]): void {
+		this.eventEmitter.emit("protocol", { type: player, lines });
+	}
+
 	private handlePlayerRequest(
 		player: "p1" | "p2",
 		request: PlayerRequest,
 	): void {
-		if (player === "p1") {
-			this.p1Request = request;
-		} else {
-			this.p2Request = request;
-		}
+		if (player === "p1") this.p1Request = request;
+		else this.p2Request = request;
 
-		this.eventEmitter.emit("playerRequest", { player, request });
-		this.eventEmitter.emit("stateUpdate", {
-			battle: this.battle,
-			logs: [...this.logs],
-			p1Request: this.p1Request,
-			p2Request: this.p2Request,
-		});
+		this.eventEmitter.emit("request", { player, request });
 	}
 
-	/**
-	 * Start the battle
-	 * @param p1Team - Optional team for player 1
-	 * @param p2Team - Optional team for player 2
-	 */
 	startBattle(p1Team?: string, p2Team?: string): void {
 		const spec = { formatid: this.format };
 
-		// Generate random teams if needed
 		const createTeam = () => {
-			// Use the built-in team generator
 			try {
 				const generator = TeamGenerators.getTeamGenerator(
 					this.format,
@@ -178,7 +163,10 @@ export class BattleEngine {
 				);
 				return DTeams.export(generator.getTeam());
 			} catch (error) {
-				console.error("Error generating random team:", error);
+				console.error(
+					`[BattleEngine ${this.battleId}] Error generating random team:`,
+					error,
+				);
 				return null;
 			}
 		};
@@ -195,115 +183,77 @@ export class BattleEngine {
 			team: p2TeamFinal ? DTeams.import(p2TeamFinal) : null,
 		};
 
-		// Start the battle
 		void this.streams.omniscient.write(`>start ${JSON.stringify(spec)}
 >player p1 ${JSON.stringify(p1spec)}
 >player p2 ${JSON.stringify(p2spec)}`);
 
-		// Emit battle start event
-		this.eventEmitter.emit("battleStart", this.battle);
+		this.eventEmitter.emit("battleStart", { battleId: this.battleId });
 	}
 
-	/**
-	 * Process a player's decision (move or switch)
-	 * @param player - The player ID
-	 * @param decision - The player's decision
-	 */
 	processPlayerDecision(player: "p1" | "p2", decision: PlayerDecision): void {
 		const playerStream = player === "p1" ? this.p1Stream : this.p2Stream;
 		let choice = "";
 
-		if (decision.type === "move") {
-			choice = `move ${decision.moveIndex}`;
-			this.eventEmitter.emit("playerMove", {
-				player,
-				moveIndex: decision.moveIndex,
-			});
-		} else if (decision.type === "switch") {
+		if (decision.type === "move") choice = `move ${decision.moveIndex}`;
+		else if (decision.type === "switch")
 			choice = `switch ${decision.pokemonIndex}`;
-			this.eventEmitter.emit("playerSwitch", {
-				player,
-				pokemonIndex: decision.pokemonIndex,
-			});
-		}
 
 		if (choice) {
-			// Clear the corresponding request as the player has made a choice
 			if (player === "p1") this.p1Request = null;
 			else this.p2Request = null;
 
-			// Write the choice to the player's stream
 			try {
 				void playerStream.write(choice);
 			} catch (error) {
-				console.error(`Error writing choice for ${player}:`, error);
+				console.error(
+					`[BattleEngine ${this.battleId}] Error writing choice for ${player}:`,
+					error,
+				);
+				const errorLine = `|error|[ChoiceError] Failed to process decision: ${error instanceof Error ? error.message : String(error)}`;
+				this.eventEmitter.emit("protocol", {
+					type: player,
+					lines: [errorLine],
+				});
 			}
-
-			// Emit state update
-			this.eventEmitter.emit("stateUpdate", {
-				battle: this.battle,
-				logs: [...this.logs],
-				p1Request: this.p1Request,
-				p2Request: this.p2Request,
-			});
 		} else {
-			console.warn(`Invalid decision type received for ${player}:`, decision);
+			console.warn(
+				`[BattleEngine ${this.battleId}] Invalid decision type received for ${player}:`,
+				decision,
+			);
 		}
 	}
 
-	/**
-	 * Get data for a move
-	 * @param moveId - The move ID
-	 * @returns The move data
-	 */
-	getMoveData(moveId: string) {
-		return this.dex.moves.get(moveId);
-	}
-
-	/**
-	 * Get data for an item
-	 * @param itemId - The item ID
-	 * @returns The item data
-	 */
-	getItem(itemId: string) {
-		return this.dex.items.get(itemId);
-	}
-
-	/**
-	 * Get data for an ability
-	 * @param abilityId - The ability ID
-	 * @returns The ability data
-	 */
-	getAbility(abilityId: string) {
-		return this.dex.abilities.get(abilityId);
-	}
-
-	/**
-	 * Subscribe to battle events with type safety
-	 * @param event - The event name
-	 * @param listener - The event listener function
-	 * @returns A function to unsubscribe
-	 */
-	on<K extends keyof BattleEventMap>(
+	on<K extends keyof BattleProtocolEventMap>(
 		event: K,
-		listener: (data: BattleEventMap[K]) => void,
+		listener: (data: BattleProtocolEventMap[K]) => void,
 	): () => void {
 		return this.eventEmitter.on(event, listener);
-	}
-
-	getBattle(): Readonly<Battle> {
-		return this.battle;
-	}
-
-	getLogs(): ReadonlyArray<string> {
-		return this.logs;
 	}
 
 	getP1Request(): Readonly<PlayerRequest> | null {
 		return this.p1Request;
 	}
-
 	getP2Request(): Readonly<PlayerRequest> | null {
 		return this.p2Request;
+	}
+
+	destroy(): void {
+		console.log(`[BattleEngine ${this.battleId}] Destroying battle...`);
+		try {
+			this.streams.omniscient.destroy();
+		} catch (e) {
+			/* ignore */
+		}
+		try {
+			this.streams.p1.destroy();
+		} catch (e) {
+			/* ignore */
+		}
+		try {
+			this.streams.p2.destroy();
+		} catch (e) {
+			/* ignore */
+		}
+		this.eventEmitter.removeAllListeners();
 	}
 }

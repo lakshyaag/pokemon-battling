@@ -2,14 +2,9 @@
 import { v4 as uuidv4 } from "uuid";
 import { create } from "zustand";
 import { io, type Socket } from "socket.io-client";
-import type {
-	BattleState,
-	PlayerDecision,
-	PlayerRequest,
-} from "@/services/battle-types"; // Assuming types are shared or copied
-import { useEffect } from "react";
+import type { PlayerDecision, PlayerId } from "@/lib/battle-types";
 
-// Define the shape of the server events data (adjust as needed)
+// Define the shape of the server events data
 interface ServerToClientEvents {
 	"server:identified": (data: {
 		socketId: string;
@@ -19,31 +14,22 @@ interface ServerToClientEvents {
 	"server:error": (data: { message: string }) => void;
 	"server:battle_created": (data: {
 		battleId: string;
-		playerRole: "p1" | "p2";
+		playerRole: PlayerId;
 	}) => void;
 	"server:battle_joined": (data: {
 		battleId: string;
-		playerRole: "p1" | "p2";
+		playerRole: PlayerId;
 		opponentUserId?: string;
 	}) => void;
-	"server:battle_update": (data: {
-		battleId: string;
-		state: BattleState;
-	}) => void; // Server sends the whole state
-	"server:battle_request": (data: {
-		battleId: string;
-		request: PlayerRequest;
-	}) => void; // Server sends specific request
+	"server:protocol": (data: { battleId: string; lines: string[] }) => void;
 	"server:battle_end": (data: {
 		battleId: string;
 		winner: string | null;
-		state: BattleState;
 	}) => void;
 	"server:opponent_disconnected": (data: {
 		battleId: string;
 		message: string;
 	}) => void;
-	// Add other events as needed
 }
 
 // Define the shape of the client events data (adjust as needed)
@@ -65,6 +51,8 @@ interface SocketState {
 	userId: string | null;
 	socketId: string | null;
 	error: string | null;
+	currentBattleId: string | null;
+	playerRole: PlayerId | null;
 	connect: (userId: string) => void;
 	disconnect: () => void;
 	identify: () => void;
@@ -72,7 +60,11 @@ interface SocketState {
 		event: Event,
 		...args: Parameters<ClientToServerEvents[Event]>
 	) => void; // Helper for type-safe emits
-	// Add specific listeners setup if needed, or handle in components
+	// Add battle-specific actions
+	createBattle: (format: string) => void;
+	joinBattle: (battleId: string) => void;
+	leaveBattle: () => void;
+	makeDecision: (decision: PlayerDecision) => void;
 }
 
 // Ensure this URL points to your running WebSocket server
@@ -85,17 +77,18 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 	userId: null,
 	socketId: null,
 	error: null,
+	currentBattleId: null,
+	playerRole: null,
 
 	connect: (userId) => {
 		if (get().socket) {
 			console.log("Socket already exists. Disconnecting first.");
-			get().disconnect(); // Ensure clean state if reconnecting
+			get().disconnect();
 		}
 
-		console.log(`Attempting to connect to ${SERVER_URL} as user ${userId}...`);
-		set({ userId: userId, error: null }); // Set userId immediately
+		console.log(`Connecting to ${SERVER_URL} as ${userId}...`);
+		set({ userId, error: null });
 
-		// Explicitly specify WebSocket transport
 		const newSocket = io(SERVER_URL, {
 			transports: ["websocket"],
 			reconnectionAttempts: 5,
@@ -110,7 +103,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 				socketId: newSocket.id,
 				error: null,
 			});
-			get().identify(); // Automatically identify upon connection
+			get().identify();
 		});
 
 		newSocket.on("disconnect", (reason) => {
@@ -120,39 +113,55 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 				isConnected: false,
 				socketId: null,
 				error: `Disconnected: ${reason}`,
+				currentBattleId: null,
+				playerRole: null,
 			});
 		});
 
 		newSocket.on("connect_error", (err) => {
 			console.error("Socket connection error:", err);
 			set({
-				socket: null, // Ensure socket is null on error
+				socket: null,
 				isConnected: false,
 				socketId: null,
 				error: `Connection failed: ${err.message}`,
+				currentBattleId: null,
+				playerRole: null,
 			});
 		});
 
-		// --- Centralized Server Event Listeners (Optional but Recommended) ---
-		// You can register listeners here that update the store directly,
-		// or let components register their own specific listeners.
-		// For now, we'll keep it simple and add specific listeners later.
+		// Battle-specific event handlers
+		newSocket.on("server:battle_created", (data) => {
+			console.log("Battle created:", data);
+			set({ currentBattleId: data.battleId, playerRole: data.playerRole });
+		});
 
+		newSocket.on("server:battle_joined", (data) => {
+			console.log("Battle joined:", data);
+			set({ currentBattleId: data.battleId, playerRole: data.playerRole });
+		});
+
+		newSocket.on("server:battle_end", (data) => {
+			console.log("Battle ended:", data);
+			// Don't clear battle ID immediately to allow for end-game UI
+			// Component should call leaveBattle when ready
+		});
+
+		newSocket.on("server:opponent_disconnected", (data) => {
+			console.log("Opponent disconnected:", data);
+			set({ error: data.message });
+			// Don't clear battle state here, let the battle_end event handle it
+		});
+
+		// Global event handlers
 		newSocket.on("server:identified", (data) => {
 			console.log("Server identified client:", data);
-			// socketId is already set on 'connect', userId is set in connect()
-			// You could add extra checks here if needed
 		});
 
 		newSocket.on("server:error", (data) => {
 			console.error("Server error:", data.message);
-			set({ error: `Server error: ${data.message}` });
-			// Potentially disconnect or show UI feedback based on error type
+			set({ error: data.message });
 		});
-
-		// --- End Centralized Listeners ---
-
-		// Note: We don't set the socket in the store *until* 'connect' fires.
 	},
 
 	disconnect: () => {
@@ -161,7 +170,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 			console.log("Disconnecting socket...");
 			socket.disconnect();
 		}
-		set({ socket: null, isConnected: false, socketId: null, error: null });
+		set({
+			socket: null,
+			isConnected: false,
+			socketId: null,
+			error: null,
+			currentBattleId: null,
+			playerRole: null,
+		});
 	},
 
 	identify: () => {
@@ -174,7 +190,6 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 		}
 	},
 
-	// Generic emit function for type safety
 	emit: (event, ...args) => {
 		const { socket } = get();
 		if (socket?.connected) {
@@ -183,8 +198,43 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 		} else {
 			console.error(`Cannot emit ${event}: Socket not connected.`);
 			set({ error: `Cannot emit ${event}: Socket not connected.` });
-			// Potentially queue the event or show an error
 		}
+	},
+
+	// Battle-specific actions
+	createBattle: (format: string) => {
+		const { userId } = get();
+		if (!userId) {
+			set({ error: "Cannot create battle: User ID not set." });
+			return;
+		}
+		get().emit("client:create_battle", { format, userId });
+	},
+
+	joinBattle: (battleId: string) => {
+		const { userId } = get();
+		if (!userId) {
+			set({ error: "Cannot join battle: User ID not set." });
+			return;
+		}
+		get().emit("client:join_battle", { battleId, userId });
+	},
+
+	leaveBattle: () => {
+		const { currentBattleId } = get();
+		if (currentBattleId) {
+			get().emit("client:leave_battle", { battleId: currentBattleId });
+			set({ currentBattleId: null, playerRole: null });
+		}
+	},
+
+	makeDecision: (decision: PlayerDecision) => {
+		const { currentBattleId } = get();
+		if (!currentBattleId) {
+			set({ error: "Cannot make decision: Not in a battle." });
+			return;
+		}
+		get().emit("client:decision", { battleId: currentBattleId, decision });
 	},
 }));
 

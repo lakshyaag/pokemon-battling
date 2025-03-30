@@ -1,16 +1,20 @@
 import { useState, useEffect } from "react";
 import type { Battle } from "@pkmn/client";
-import type { PlayerRequest, PlayerDecision } from "@/services/battle-types";
+import type { PlayerRequest, PlayerDecision } from "@/lib/battle-types";
 import type { GenerationNum } from "@pkmn/types";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { TypeBadge } from "./ui/type-badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { TypeBadge } from "@/components/ui/type-badge";
 import BattleMoveButton from "./BattleMoveButton";
 import SwitchButton from "./SwitchButton";
 import { getSprite, parseCondition, getHPColor } from "@/utils/pokemonUtils";
 import { getStatusClass, getStatusName } from "@/lib/utils";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
 import { Dex } from "@pkmn/sim";
 import { useSettings } from "@/store/settings";
 

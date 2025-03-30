@@ -1,11 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import type {
-	BattleState,
-	PlayerDecision,
-	PlayerRequest,
-} from "@/services/battle-types";
+import type { PlayerDecision, PlayerRequest } from "@/lib/battle-types";
 import type { Battle } from "@pkmn/client";
 import { Badge } from "./ui/badge";
 import { useSettings } from "@/store/settings";
@@ -15,7 +11,8 @@ import PlayerDisplay from "./PlayerDisplay";
 
 interface BattleViewProps {
 	battleId: string;
-	battleState: BattleState;
+	clientBattle: Battle;
+	formattedLogs: string[];
 	playerRequest: PlayerRequest | null;
 	playerRole: "p1" | "p2";
 	onDecision: (decision: PlayerDecision | null) => void;
@@ -27,7 +24,8 @@ interface BattleViewProps {
  */
 export default function BattleView({
 	battleId,
-	battleState,
+	clientBattle,
+	formattedLogs,
 	playerRequest,
 	playerRole,
 	onDecision,
@@ -35,12 +33,12 @@ export default function BattleView({
 }: BattleViewProps) {
 	const { generation } = useSettings();
 	const logScrollAreaRef = useRef<HTMLDivElement>(null);
-
-	// Local state for UI selection feedback
 	const [selectedDecision, setSelectedDecision] =
 		useState<PlayerDecision | null>(null);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: Trigger scroll on log changes
+	// Scroll logs to bottom when they update
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		if (logScrollAreaRef.current) {
 			const scrollElement = logScrollAreaRef.current.querySelector(
@@ -50,7 +48,7 @@ export default function BattleView({
 				scrollElement.scrollTop = scrollElement.scrollHeight;
 			}
 		}
-	}, [battleState?.logs]);
+	}, [formattedLogs]);
 
 	// Handle internal decision selection and pass up
 	const handleLocalDecision = (decision: PlayerDecision | null) => {
@@ -58,16 +56,15 @@ export default function BattleView({
 		onDecision(decision);
 	};
 
-	// Reset local selection when a new request comes in or state updates significantly
+	// Reset local selection when a new request comes in or turn changes
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		setSelectedDecision(null);
-	}, [playerRequest, battleState?.battle?.turn]);
+	}, [playerRequest, clientBattle?.turn]);
 
-	// Render battle logs
+	// Render battle logs from formatted logs prop
 	const renderBattleLogs = () => {
-		if (!battleState?.logs) return null;
-		const turn = battleState.battle?.turn ?? 0;
+		const turn = clientBattle?.turn ?? 0;
 
 		return (
 			<Card className="h-full flex flex-col">
@@ -79,18 +76,18 @@ export default function BattleView({
 						className="h-[calc(100vh-250px)] p-4"
 						ref={logScrollAreaRef}
 					>
-						{battleState.logs.length === 0 && (
+						{formattedLogs.length === 0 && (
 							<p className="text-center text-muted-foreground italic mt-4">
 								Battle starting...
 							</p>
 						)}
-						{battleState.logs.map((log, index) => {
+						{formattedLogs.map((log, index) => {
 							const key = `${turn}-${index}-${log.substring(0, 10)}`;
 							return (
 								<div
 									key={key}
 									className="mb-1 last:mb-0 protocol-line text-sm leading-normal [&_b]:font-semibold"
-									// biome-ignore lint/security/noDangerouslySetInnerHtml: Sanitized by LogFormatter
+									// Logs are pre-formatted HTML from LogFormatter
 									dangerouslySetInnerHTML={{ __html: log }}
 								/>
 							);
@@ -101,16 +98,11 @@ export default function BattleView({
 		);
 	};
 
-	if (!battleState?.battle) {
+	if (!clientBattle) {
 		return <div>Waiting for battle data...</div>;
 	}
 
-	const battle = battleState.battle as Battle & {
-		winner?: string | null;
-		ended?: boolean;
-	};
 	const isEnded = winner !== undefined;
-
 	const opponentRole = playerRole === "p1" ? "p2" : "p1";
 
 	return (
@@ -143,11 +135,11 @@ export default function BattleView({
 
 			{/* Main Battle Grid */}
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-				{/* Player Display (Client's Player) */}
+				{/* Player Display (Self) */}
 				<div className="col-span-1">
 					<PlayerDisplay
 						player={playerRole}
-						battle={battle}
+						battle={clientBattle}
 						request={playerRequest}
 						generation={generation}
 						selectedDecision={selectedDecision}
@@ -163,12 +155,8 @@ export default function BattleView({
 				<div className="col-span-1">
 					<PlayerDisplay
 						player={opponentRole}
-						battle={battle}
-						request={
-							opponentRole === "p1"
-								? battleState.p1Request
-								: battleState.p2Request
-						}
+						battle={clientBattle}
+						request={null} // Opponent requests not needed
 						generation={generation}
 						selectedDecision={null}
 						onDecision={() => {}}

@@ -1,5 +1,4 @@
 import type { GraphicsGen } from "@pkmn/img";
-import { PRNG } from "@pkmn/sim";
 import type { GenerationNum, TypeName } from "@pkmn/types";
 
 const SPRITES: { [gen in GenerationNum]: GraphicsGen } = {

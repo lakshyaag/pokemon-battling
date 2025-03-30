@@ -10,10 +10,8 @@ import { battleManager } from "../services/battle-manager-instance";
 import type {
 	BattleOptions,
 	PlayerDecision,
-	PlayerRequest,
-	BattleState,
+	PlayerId,
 } from "../services/battle-types";
-import type { Battle } from "@pkmn/client";
 
 // --- Basic Server Setup ---
 const app = express();
@@ -33,7 +31,7 @@ const PORT = process.env.PORT || 8080;
 interface ClientInfo {
 	userId: string;
 	currentBattleId?: string;
-	playerRole?: "p1" | "p2";
+	playerRole?: PlayerId;
 }
 
 interface SocketInfo {
@@ -47,6 +45,7 @@ interface BattleRoom {
 	p2: SocketInfo | null;
 	spectators: string[];
 	format: string;
+	started: boolean;
 }
 
 const connectedClients = new Map<string, ClientInfo>();
@@ -67,7 +66,6 @@ function getBattleRoom(battleId: string): BattleRoom | undefined {
 io.on("connection", (socket: Socket) => {
 	console.log(`[Socket ${socket.id}] Client connected.`);
 
-	// --- Handle Client Identification ---
 	socket.on("client:identify", (data: { userId: string }) => {
 		const userId = data?.userId?.trim();
 		const existingClient = Array.from(connectedClients.entries()).find(
@@ -99,15 +97,11 @@ io.on("connection", (socket: Socket) => {
 		});
 	});
 
-	// --- Handle Battle Creation ---
 	socket.on(
 		"client:create_battle",
 		(data: { format: string; userId: string }) => {
 			const clientInfo = getClientInfo(socket.id);
 			if (!clientInfo || clientInfo.userId !== data.userId) {
-				console.warn(
-					`[Socket ${socket.id}] Create battle request from unidentified or mismatched user.`,
-				);
 				socket.emit("server:error", {
 					message: "Identify first or user ID mismatch.",
 				});
@@ -131,12 +125,10 @@ io.on("connection", (socket: Socket) => {
 
 			try {
 				const battleOptions: BattleOptions = {
-					format: format,
-					p1Name: p1Name,
-					p2Name: p2Name,
-					onBattleUpdate: (state: BattleState) => {
-						io.to(battleId).emit("server:battle_update", { battleId, state });
-					},
+					format,
+					p1Name,
+					p2Name,
+					debug: process.env.NODE_ENV === "development",
 				};
 
 				const battleEngine = battleManager.createBattle(
@@ -144,48 +136,61 @@ io.on("connection", (socket: Socket) => {
 					battleOptions,
 				);
 
-				battleEngine.on("playerRequest", ({ player, request }) => {
+				// Wire up protocol events
+				battleEngine.on("protocol", ({ type, lines }) => {
 					const battleRoom = getBattleRoom(battleId);
-					if (!battleRoom) return;
+					if (!battleRoom?.started) return;
+
+					if (type === "omniscient") {
+						io.to(battleId).emit("server:protocol", { battleId, lines });
+					} else {
+						const targetSocketId =
+							type === "p1" ? battleRoom.p1?.socketId : battleRoom.p2?.socketId;
+						if (targetSocketId) {
+							io.to(targetSocketId).emit("server:protocol", {
+								battleId,
+								lines,
+							});
+						}
+					}
+				});
+
+				// Wire up request events
+				battleEngine.on("request", ({ player, request }) => {
+					const battleRoom = getBattleRoom(battleId);
+					if (!battleRoom?.started) return;
 
 					const targetSocketId =
 						player === "p1" ? battleRoom.p1?.socketId : battleRoom.p2?.socketId;
 					if (targetSocketId) {
-						io.to(targetSocketId).emit("server:battle_request", {
+						const requestLine = `|request|${JSON.stringify(request)}`;
+						io.to(targetSocketId).emit("server:protocol", {
 							battleId,
-							request,
+							lines: [requestLine],
 						});
-						console.log(
-							`[Battle ${battleId}] Sent request to ${player} (${targetSocketId})`,
-						);
-					} else {
-						console.warn(
-							`[Battle ${battleId}] Could not find socket ID for ${player} to send request.`,
-						);
+						console.log(`[Battle ${battleId}] Sent request to ${player}`);
 					}
 				});
 
-				battleEngine.on("battleEnd", ({ winner, state }) => {
-					io.to(battleId).emit("server:battle_end", {
-						battleId,
-						winner,
-						state,
-					});
-					console.log(
-						`[Battle ${battleId}] Ended. Winner: ${winner}. Notifying room.`,
-					);
-					setTimeout(() => {
-						activeBattles.delete(battleId);
-						console.log(`[Battle ${battleId}] Removed battle room state.`);
-					}, 61000);
+				// Wire up battle end
+				battleEngine.on("battleEnd", ({ winner }) => {
+					const battleRoom = getBattleRoom(battleId);
+					if (!battleRoom) return;
+
+					io.to(battleId).emit("server:battle_end", { battleId, winner });
+					console.log(`[Battle ${battleId}] Battle ended. Winner: ${winner}`);
+
+					battleRoom.started = false;
+					// Cleanup handled by manager's timeout
 				});
 
 				const newBattleRoom: BattleRoom = {
-					battleId: battleId,
+					battleId,
 					p1: { socketId: socket.id, userId: clientInfo.userId },
 					p2: null,
 					spectators: [],
-					format: format,
+					format,
+					started: false,
 				};
 				activeBattles.set(battleId, newBattleRoom);
 
@@ -193,29 +198,224 @@ io.on("connection", (socket: Socket) => {
 				clientInfo.playerRole = "p1";
 
 				socket.join(battleId);
-				console.log(
-					`[Socket ${socket.id}] User ${clientInfo.userId} joined room ${battleId} as P1.`,
-				);
-
-				socket.emit("server:battle_created", {
-					battleId: battleId,
-					playerRole: "p1",
-				});
-
+				socket.emit("server:battle_created", { battleId, playerRole: "p1" });
 				console.log(`[Battle ${battleId}] Waiting for P2 to join.`);
-			} catch (error) {
+			} catch (error: unknown) {
 				console.error(`[Socket ${socket.id}] Error creating battle:`, error);
 				socket.emit("server:error", {
-					message: `Failed to create battle: ${error}`,
+					message: `Failed to create battle: ${error instanceof Error ? error.message : String(error)}`,
 				});
-				if (battleManager.getBattle(battleId)) {
-					battleManager.removeBattle(battleId);
-				}
+				battleManager.removeBattle(battleId);
 			}
 		},
 	);
 
-	// --- Handle Player Decisions ---
+	socket.on(
+		"client:join_battle",
+		(data: { battleId: string; userId: string }) => {
+			const clientInfo = getClientInfo(socket.id);
+			const battleId = data.battleId;
+
+			if (!clientInfo || clientInfo.userId !== data.userId) {
+				socket.emit("server:error", {
+					message: "Identify first or user ID mismatch.",
+				});
+				return;
+			}
+
+			const battleRoom = getBattleRoom(battleId);
+
+			// --- Rejoin Logic ---
+			if (clientInfo.currentBattleId === battleId && battleRoom) {
+				console.log(
+					`[Socket ${socket.id}] User ${clientInfo.userId} rejoining battle ${battleId}.`,
+				);
+				socket.join(battleId);
+				socket.emit("server:battle_joined", {
+					battleId,
+					playerRole: clientInfo.playerRole,
+					opponentUserId:
+						clientInfo.playerRole === "p1"
+							? battleRoom.p2?.userId
+							: battleRoom.p1?.userId,
+				});
+
+				const engine = battleManager.getBattle(battleId);
+				if (engine && battleRoom.started) {
+					// Send current request if applicable
+					const request =
+						clientInfo.playerRole === "p1"
+							? engine.getP1Request()
+							: engine.getP2Request();
+					if (request) {
+						const requestLine = `|request|${JSON.stringify(request)}`;
+						io.to(socket.id).emit("server:protocol", {
+							battleId,
+							lines: [requestLine],
+						});
+						console.log(
+							`[Battle ${battleId}] Re-sent request to rejoining ${clientInfo.playerRole}`,
+						);
+					}
+				} else if (!engine) {
+					socket.emit("server:error", {
+						message: "Battle ended or could not be found on rejoin.",
+					});
+					clientInfo.currentBattleId = undefined;
+					clientInfo.playerRole = undefined;
+					activeBattles.delete(battleId);
+				}
+				return;
+			}
+
+			// --- New Join Logic ---
+			if (clientInfo.currentBattleId) {
+				socket.emit("server:error", {
+					message: "You are already in a battle.",
+				});
+				return;
+			}
+			if (!battleRoom) {
+				socket.emit("server:error", {
+					message: `Battle with ID ${battleId} not found.`,
+				});
+				return;
+			}
+			if (battleRoom.p2 !== null) {
+				socket.emit("server:error", {
+					message: "This battle is already full.",
+				});
+				return;
+			}
+			if (battleRoom.p1?.userId === clientInfo.userId) {
+				socket.emit("server:error", {
+					message: "You cannot join your own battle as Player 2.",
+				});
+				return;
+			}
+
+			// Assign P2
+			console.log(
+				`[Socket ${socket.id}] User ${clientInfo.userId} joining battle ${battleId} as P2.`,
+			);
+			battleRoom.p2 = { socketId: socket.id, userId: clientInfo.userId };
+			clientInfo.currentBattleId = battleId;
+			clientInfo.playerRole = "p2";
+			socket.join(battleId);
+
+			// Notify players
+			socket.emit("server:battle_joined", {
+				battleId,
+				playerRole: "p2",
+				opponentUserId: battleRoom.p1?.userId,
+			});
+			if (battleRoom.p1) {
+				io.to(battleRoom.p1.socketId).emit("server:battle_joined", {
+					battleId,
+					playerRole: "p1",
+					opponentUserId: clientInfo.userId,
+				});
+			}
+
+			// Start the Battle
+			console.log(
+				`[Battle ${battleId}] Both players present. Starting battle simulation.`,
+			);
+			battleRoom.started = true;
+			try {
+				battleManager.startBattle(battleId);
+			} catch (error) {
+				console.error(
+					`[Battle ${battleId}] Error starting battle simulation:`,
+					error,
+				);
+				io.to(battleId).emit("server:error", {
+					message: `Failed to start battle: ${error}`,
+				});
+
+				const engine = battleManager.getBattle(battleId);
+				if (engine) engine.destroy();
+				battleManager.removeBattle(battleId);
+				activeBattles.delete(battleId);
+
+				// Reset client states
+				if (battleRoom.p1) {
+					const p1Info = getClientInfo(battleRoom.p1.socketId);
+					if (p1Info) {
+						p1Info.currentBattleId = undefined;
+						p1Info.playerRole = undefined;
+					}
+				}
+				clientInfo.currentBattleId = undefined;
+				clientInfo.playerRole = undefined;
+			}
+		},
+	);
+
+	socket.on("client:leave_battle", (data: { battleId: string }) => {
+		const clientInfo = getClientInfo(socket.id);
+		const battleId = data.battleId;
+
+		if (!clientInfo || clientInfo.currentBattleId !== battleId) {
+			console.warn(
+				`[Socket ${socket.id}] Attempted to leave battle ${battleId} but not in it.`,
+			);
+			return;
+		}
+
+		const battleRoom = getBattleRoom(battleId);
+		console.log(
+			`[Socket ${socket.id}] User ${clientInfo.userId} leaving battle ${battleId}.`,
+		);
+		socket.leave(battleId);
+
+		clientInfo.currentBattleId = undefined;
+		clientInfo.playerRole = undefined;
+
+		if (battleRoom) {
+			let opponentSocketId: string | undefined = undefined;
+			const leavingRole = clientInfo.playerRole;
+
+			if (leavingRole === "p1" && battleRoom.p1?.socketId === socket.id) {
+				battleRoom.p1 = null;
+				opponentSocketId = battleRoom.p2?.socketId;
+			} else if (
+				leavingRole === "p2" &&
+				battleRoom.p2?.socketId === socket.id
+			) {
+				battleRoom.p2 = null;
+				opponentSocketId = battleRoom.p1?.socketId;
+			}
+
+			if (opponentSocketId) {
+				io.to(opponentSocketId).emit("server:opponent_disconnected", {
+					battleId: battleId,
+					message: `Your opponent (${clientInfo.userId}) left the battle.`,
+				});
+				const opponentInfo = getClientInfo(opponentSocketId);
+				if (opponentInfo) {
+					opponentInfo.currentBattleId = undefined;
+					opponentInfo.playerRole = undefined;
+				}
+				if (battleRoom.started) {
+					console.log(
+						`[Battle ${battleId}] Forfeiting battle due to disconnect.`,
+					);
+					battleManager.removeBattle(battleId);
+					activeBattles.delete(battleId);
+				}
+			}
+
+			if (!battleRoom.p1 && !battleRoom.p2) {
+				console.log(
+					`[Battle ${battleId}] Both players disconnected/left. Removing battle.`,
+				);
+				battleManager.removeBattle(battleId);
+				activeBattles.delete(battleId);
+			}
+		}
+	});
+
 	socket.on(
 		"client:decision",
 		(data: { battleId: string; decision: PlayerDecision }) => {
@@ -225,13 +425,15 @@ io.on("connection", (socket: Socket) => {
 			if (
 				!clientInfo ||
 				!battleRoom ||
-				clientInfo.currentBattleId !== data.battleId
+				clientInfo.currentBattleId !== data.battleId ||
+				!battleRoom.started
 			) {
 				console.warn(
-					`[Socket ${socket.id}] Invalid decision request (not in battle?).`,
+					`[Socket ${socket.id}] Invalid decision request (not in battle/battle not started).`,
 				);
 				socket.emit("server:error", {
-					message: "Cannot make decision: Not in this battle.",
+					message:
+						"Cannot make decision: Not in this battle or battle not started.",
 				});
 				return;
 			}
@@ -265,7 +467,6 @@ io.on("connection", (socket: Socket) => {
 		},
 	);
 
-	// --- Handle Client Disconnection ---
 	socket.on("disconnect", (reason: string) => {
 		const clientInfo = getClientInfo(socket.id);
 		if (!clientInfo) {
@@ -287,14 +488,17 @@ io.on("connection", (socket: Socket) => {
 				console.log(
 					`[Battle ${battleId}] Player ${userId} (${clientInfo.playerRole}) disconnected.`,
 				);
-				socket.leave(battleId);
 
 				let opponentSocketId: string | undefined = undefined;
+				const leavingRole = clientInfo.playerRole;
 
-				if (clientInfo.playerRole === "p1") {
+				if (leavingRole === "p1" && battleRoom.p1?.socketId === socket.id) {
 					battleRoom.p1 = null;
 					opponentSocketId = battleRoom.p2?.socketId;
-				} else if (clientInfo.playerRole === "p2") {
+				} else if (
+					leavingRole === "p2" &&
+					battleRoom.p2?.socketId === socket.id
+				) {
 					battleRoom.p2 = null;
 					opponentSocketId = battleRoom.p1?.socketId;
 				}
@@ -309,11 +513,18 @@ io.on("connection", (socket: Socket) => {
 						opponentInfo.currentBattleId = undefined;
 						opponentInfo.playerRole = undefined;
 					}
+					if (battleRoom.started) {
+						console.log(
+							`[Battle ${battleId}] Forfeiting battle due to disconnect.`,
+						);
+						battleManager.removeBattle(battleId);
+						activeBattles.delete(battleId);
+					}
 				}
 
 				if (!battleRoom.p1 && !battleRoom.p2) {
 					console.log(
-						`[Battle ${battleId}] Both players disconnected. Removing battle.`,
+						`[Battle ${battleId}] Both players disconnected/left. Removing battle.`,
 					);
 					battleManager.removeBattle(battleId);
 					activeBattles.delete(battleId);

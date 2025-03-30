@@ -7,7 +7,7 @@ import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Sprites } from "@pkmn/img";
 import { useSettings } from "@/store/settings";
 import { getGraphics } from "@/lib/constants";
-import type { PlayerRequest } from "@/services/battle-types";
+import type { PlayerRequest } from "@/lib/battle-types";
 import type { GenderName } from "@pkmn/types";
 
 type PokemonInfo = NonNullable<PlayerRequest["side"]["pokemon"][number]>;
