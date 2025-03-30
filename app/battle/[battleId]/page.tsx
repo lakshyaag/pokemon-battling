@@ -78,13 +78,12 @@ export default function BattlePage() {
 					const { args, kwArgs } = Protocol.parseBattleLine(line);
 					// Format log line
 					const html = formatterRef.current.formatHTML(args, kwArgs);
-
-					// Add to client battle state
-					battleRef.current.add(args, kwArgs);
-
 					if (html) {
 						currentLogs.push(html);
 					}
+
+					// Add to client battle state
+					battleRef.current.add(args, kwArgs);
 
 					// Check if this line is a request for *this* player
 					if (args[0] === "request" && playerRole) {
@@ -108,8 +107,6 @@ export default function BattlePage() {
 
 			// Update battle state after processing all lines in the batch
 			battleRef.current.update();
-
-			console.log(battleRef.current);
 
 			// Update React state
 			setFormattedLogs((prev) => [...prev, ...(currentLogs as string[])]);

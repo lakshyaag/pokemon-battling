@@ -301,6 +301,8 @@ io.on("connection", (socket: Socket) => {
 			battleRoom.p2 = { socketId: socket.id, userId: clientInfo.userId };
 			clientInfo.currentBattleId = battleId;
 			clientInfo.playerRole = "p2";
+			const engine = battleManager.getBattle(battleId);
+			engine?.updatePlayerName("p2", clientInfo.userId);
 			socket.join(battleId);
 
 			// Notify players

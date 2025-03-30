@@ -237,6 +237,11 @@ export class BattleEngine {
 		return this.p2Request;
 	}
 
+	updatePlayerName(player: "p1" | "p2", name: string): void {
+		if (player === "p1") this.p1.playerName = name;
+		else this.p2.playerName = name;
+	}
+
 	destroy(): void {
 		console.log(`[BattleEngine ${this.battleId}] Destroying battle...`);
 		try {
