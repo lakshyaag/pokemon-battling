@@ -46,6 +46,8 @@ interface BattleRoom {
 	spectators: string[];
 	format: string;
 	started: boolean;
+	p1Decision: PlayerDecision | null;
+	p2Decision: PlayerDecision | null;
 }
 
 const connectedClients = new Map<string, ClientInfo>();
@@ -191,6 +193,8 @@ io.on("connection", (socket: Socket) => {
 					spectators: [],
 					format,
 					started: false,
+					p1Decision: null,
+					p2Decision: null,
 				};
 				activeBattles.set(battleId, newBattleRoom);
 
@@ -456,7 +460,37 @@ io.on("connection", (socket: Socket) => {
 				data.decision,
 			);
 			try {
-				battleManager.makePlayerMove(data.battleId, playerRole, data.decision);
+				if (playerRole === "p1") {
+					battleRoom.p1Decision = data.decision;
+				} else {
+					battleRoom.p2Decision = data.decision;
+				}
+
+				if (battleRoom.p1Decision && battleRoom.p2Decision) {
+					console.log(
+						`[Battle ${data.battleId}] Both players have made their decisions.`,
+					);
+
+					// Both players have made their decisions, pass them to the engine
+					battleManager.makePlayerMove(
+						data.battleId,
+						"p1",
+						battleRoom.p1Decision,
+					);
+					battleManager.makePlayerMove(
+						data.battleId,
+						"p2",
+						battleRoom.p2Decision,
+					);
+
+					// Reset decisions for next turn
+					battleRoom.p1Decision = null;
+					battleRoom.p2Decision = null;
+				} else {
+					console.log(
+						`[Battle ${data.battleId}] Waiting for both players to make decisions.`,
+					);
+				}
 			} catch (error) {
 				console.error(
 					`[Battle ${data.battleId}] Error processing decision for ${playerRole}:`,
