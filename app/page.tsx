@@ -8,9 +8,76 @@ import {
 	CardContent,
 	CardFooter,
 } from "@/components/ui/card";
-import { ArrowRight, Swords, Dices } from "lucide-react";
+import { ArrowRight, Dices, Loader2 } from "lucide-react";
+import { useSocketStore } from "@/store/socket";
+import { useSettings } from "@/store/settings";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getFormat } from "@/lib/constants";
 
 export default function Home() {
+	const { isConnected, socket, userId, emit } = useSocketStore();
+	const { generation } = useSettings();
+	const router = useRouter();
+	const [isCreatingBattle, setIsCreatingBattle] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!socket) return;
+
+		const handleBattleCreated = (data: {
+			battleId: string;
+			playerRole: "p1" | "p2";
+		}) => {
+			console.log("Received server:battle_created", data);
+			setIsCreatingBattle(false);
+			router.push(`/battle/${data.battleId}`);
+		};
+
+		const handleError = (data: { message: string }) => {
+			console.error(
+				"Received server error during battle creation:",
+				data.message,
+			);
+			setError(`Failed to create battle: ${data.message}`);
+			setIsCreatingBattle(false);
+		};
+
+		socket.on("server:battle_created", handleBattleCreated);
+		socket.on("server:error", handleError);
+
+		return () => {
+			socket.off("server:battle_created", handleBattleCreated);
+			socket.off("server:error", handleError);
+		};
+	}, [socket, router]);
+
+	const handleCreateRandomBattle = () => {
+		if (!isConnected || !userId || !socket) {
+			setError("Not connected to the server. Please wait or refresh.");
+			console.error("Cannot create battle: Not connected.");
+			return;
+		}
+		if (isCreatingBattle) return;
+
+		setError(null);
+		setIsCreatingBattle(true);
+		console.log("Requesting random battle creation...");
+
+		const format = getFormat(generation);
+
+		emit("client:create_battle", { format, userId });
+
+		const timeoutId = setTimeout(() => {
+			if (isCreatingBattle) {
+				setError("Server did not respond to battle creation request.");
+				setIsCreatingBattle(false);
+			}
+		}, 15000);
+
+		return () => clearTimeout(timeoutId);
+	};
+
 	return (
 		<div className="min-h-screen bg-background">
 			<div className="container mx-auto px-4 py-16">
@@ -21,6 +88,10 @@ export default function Home() {
 					<p className="text-xl text-muted-foreground max-w-2xl">
 						Experience thrilling Pokemon battles!
 					</p>
+					{!isConnected && (
+						<p className="text-yellow-600">Connecting to server...</p>
+					)}
+					{error && <p className="text-destructive">{error}</p>}
 				</div>
 
 				<div className="grid grid-cols-1 gap-6 max-w-4xl mx-auto">
@@ -33,18 +104,28 @@ export default function Home() {
 						</CardHeader>
 						<CardContent>
 							<p className="text-muted-foreground">
-								Jump straight into action with randomly selected Pokemon, and
-								see how they battle it out!
+								Jump straight into action with randomly selected Pokemon! Find
+								an opponent and battle it out.
 							</p>
 						</CardContent>
 						<CardFooter className="mt-auto">
-							<Button variant="default" className="w-full" size="lg" asChild>
-								<Link
-									href="/battle"
-									className="flex items-center justify-center gap-2"
-								>
-									Random Battle <ArrowRight className="w-4 h-4" />
-								</Link>
+							<Button
+								variant="default"
+								className="w-full"
+								size="lg"
+								onClick={handleCreateRandomBattle}
+								disabled={!isConnected || isCreatingBattle}
+							>
+								{isCreatingBattle ? (
+									<>
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										Creating Battle...
+									</>
+								) : (
+									<>
+										Find Random Battle <ArrowRight className="ml-2 w-4 h-4" />
+									</>
+								)}
 							</Button>
 						</CardFooter>
 					</Card>
