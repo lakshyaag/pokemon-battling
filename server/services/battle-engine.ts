@@ -46,19 +46,21 @@ export class BattleEngine {
 	private p1Request: PlayerRequest | null = null;
 	private p2Request: PlayerRequest | null = null;
 	private battleId: string;
+	private debug: boolean;
 
 	constructor(battleId: string, options: BattleOptions) {
 		this.battleId = battleId;
 		this.format = (options.format as ID) || ("gen3randombattle" as ID);
+		this.debug = options.debug ?? false;
 		this.prng = new PRNG();
 		this.dex = Dex.forFormat(this.format);
-		// @ts-ignore - Dex expects Dex | ModdedDex, Generations expects Dex
+		// @ts-ignore
 		this.gens = new Generations(Dex);
 		this.eventEmitter = new BattleEventEmitter<BattleProtocolEventMap>();
 
 		DTeams.setGeneratorFactory(TeamGenerators);
 		this.streams = BattleStreams.getPlayerStreams(
-			new BattleStreams.BattleStream({ debug: true }),
+			new BattleStreams.BattleStream({ debug: this.debug }),
 		);
 		this.p1Stream = this.streams.p1;
 		this.p2Stream = this.streams.p2;
@@ -66,20 +68,20 @@ export class BattleEngine {
 
 		this.p1 = new ManualPlayer(
 			this.p1Stream,
-			false,
+			this.debug,
 			options.p1Name,
 			(request: PlayerRequest) => this.handlePlayerRequest("p1", request),
 			(lines: string[]) => this.handlePlayerProtocol("p1", lines),
 		);
 		this.p2 = new ManualPlayer(
 			this.p2Stream,
-			false,
+			this.debug,
 			options.p2Name,
 			(request: PlayerRequest) => this.handlePlayerRequest("p2", request),
 			(lines: string[]) => this.handlePlayerProtocol("p2", lines),
 		);
 
-		this.startOmniscientStream();
+		void this.startOmniscientStream();
 	}
 
 	private async startOmniscientStream(): Promise<void> {
@@ -88,11 +90,10 @@ export class BattleEngine {
 				const lines = chunk.split("\n").filter((line) => line.length > 0);
 				if (lines.length === 0) continue;
 
-				// Process lines internally FIRST
 				for (const line of lines) {
 					try {
 						const { args, kwArgs } = Protocol.parseBattleLine(line);
-						// @ts-ignore - Protocol.parseBattleLine returns a compatible type but TypeScript can't infer it
+						// @ts-ignore
 						this.battle.add(args, kwArgs);
 					} catch (e) {
 						console.error(
@@ -108,30 +109,32 @@ export class BattleEngine {
 					}
 				}
 
-				// Emit the raw lines for the clients
 				this.eventEmitter.emit("protocol", { type: "omniscient", lines });
 
-				// Check for battle end condition after processing lines
 				if (this.battle.ended) {
-					console.log(
-						`[BattleEngine ${this.battleId}] Battle ended internally. Winner: ${this.battle.winner}`,
-					);
+					if (this.debug) {
+						console.log(
+							`[BattleEngine ${this.battleId}] Battle ended internally. Winner: ${this.battle.winner}`,
+						);
+					}
 					this.eventEmitter.emit("battleEnd", {
 						winner: this.battle.winner || null,
 					});
 					break;
 				}
 			}
-			console.log(
-				`[BattleEngine ${this.battleId}] Omniscient stream finished.`,
-			);
+			if (this.debug) {
+				console.log(
+					`[BattleEngine ${this.battleId}] Omniscient stream finished.`,
+				);
+			}
 		} catch (error) {
 			console.error(
 				`[BattleEngine ${this.battleId}] Omniscient stream error:`,
 				error,
 			);
 			this.eventEmitter.emit("battleEnd", {
-				winner: `error: ${error}`,
+				winner: null,
 			});
 		} finally {
 			this.destroy();
@@ -233,6 +236,7 @@ export class BattleEngine {
 	getP1Request(): Readonly<PlayerRequest> | null {
 		return this.p1Request;
 	}
+
 	getP2Request(): Readonly<PlayerRequest> | null {
 		return this.p2Request;
 	}
@@ -243,7 +247,9 @@ export class BattleEngine {
 	}
 
 	destroy(): void {
-		console.log(`[BattleEngine ${this.battleId}] Destroying battle...`);
+		if (this.debug) {
+			console.log(`[BattleEngine ${this.battleId}] Destroying battle...`);
+		}
 		try {
 			this.streams.omniscient.destroy();
 		} catch (e) {

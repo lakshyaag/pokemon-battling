@@ -30,7 +30,6 @@ export default function SwitchButton({
 
 	// Extract basic info
 
-	console.log(pokemonInfo);
 	const name = pokemonInfo.details.split(",")[0].replace(/-.+$/, "");
 	const level = pokemonInfo.details.match(/, L(\d+)/)?.[1] || "100";
 	const gender = pokemonInfo.details.includes(", M")

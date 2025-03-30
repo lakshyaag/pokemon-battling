@@ -72,7 +72,7 @@ export default function PlayerDisplay({
 			);
 		}
 
-		const spriteUrl = getSprite(pokemon, player, generation);
+		const spriteUrl = getSprite(pokemon, isSelf ? "p1" : "p2", generation);
 		const itemData = pokemonFromRequest?.item
 			? localDex.items.get(pokemonFromRequest.item)
 			: null;

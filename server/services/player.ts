@@ -57,30 +57,32 @@ export class ManualPlayer {
 	 */
 	receive(chunk: string): void {
 		if (this.debug) console.log(`${this.playerName} received:`, chunk);
-		const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+		const playerSpecificLines: string[] = [];
 
-		if (lines.length > 0) {
-			// Pass ALL non-empty lines up to the engine
-			this.onProtocolLine(lines);
+		for (const line of chunk.split("\n")) {
+			if (!line) continue;
 
-			// Process requests and errors specifically
-			for (const line of lines) {
-				if (line.startsWith("|request|")) {
-					try {
-						const requestJson = line.substring(9); // Skip "|request|"
-						const request = JSON.parse(requestJson);
-						this.receiveRequest(request);
-					} catch (e) {
-						console.error(
-							`${this.playerName} error parsing request JSON:`,
-							e,
-							line,
-						);
-					}
-				} else if (line.startsWith("|error|")) {
-					this.receiveError(new Error(line.substring(7))); // Skip "|error|"
+			if (line.startsWith("|request|")) {
+				playerSpecificLines.push(line);
+				try {
+					const requestJson = line.substring(9);
+					const request = JSON.parse(requestJson);
+					this.receiveRequest(request);
+				} catch (e) {
+					console.error(`${this.playerName} error parsing request JSON:`, e, line);
+					if (!playerSpecificLines.includes(line)) playerSpecificLines.push(line);
 				}
+			} else if (line.startsWith("|error|")) {
+				const errorMsg = line.substring(7);
+				if (errorMsg.startsWith("[Unavailable choice]") || errorMsg.startsWith("[Invalid choice]")) {
+					playerSpecificLines.push(line);
+				}
+				this.receiveError(new Error(errorMsg));
 			}
+		}
+
+		if (playerSpecificLines.length > 0) {
+			this.onProtocolLine(playerSpecificLines);
 		}
 	}
 
@@ -89,11 +91,7 @@ export class ManualPlayer {
 	 * @param error - The error
 	 */
 	receiveError(error: Error): void {
-		console.error(`${this.playerName} received battle error:`, error.message);
-		// Note: The error line is already sent via onProtocolLine
-
-		// Don't throw on unavailable choice errors as they're handled by followup requests
-		if (error.message.startsWith("[Unavailable choice]")) return;
+		console.error(`${this.playerName} received error line:`, error.message);
 	}
 
 	/**
