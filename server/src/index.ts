@@ -25,7 +25,6 @@ const io = new Server(server, {
 	},
 	pingInterval: 5000,
 	pingTimeout: 10000,
-	transports: ["websocket"],
 });
 
 const PORT = process.env.PORT || 8080;

@@ -92,7 +92,6 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 		const newSocket = io(SERVER_URL, {
 			reconnectionAttempts: 5,
 			timeout: 10000,
-			transports: ["websocket"],
 		});
 
 		newSocket.on("connect", () => {
