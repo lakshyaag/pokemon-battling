@@ -104,6 +104,11 @@ io.on("connection", (socket: Socket) => {
 	socket.on(
 		"client:create_battle",
 		(data: { format: string; userId: string }) => {
+			socket.emit("server:battle_created", {
+				battleId: "123",
+				playerRole: "p1",
+			});
+			return;
 			const clientInfo = getClientInfo(socket.id);
 			if (!clientInfo || clientInfo.userId !== data.userId) {
 				socket.emit("server:error", {
@@ -208,9 +213,7 @@ io.on("connection", (socket: Socket) => {
 				clientInfo.currentBattleId = battleId;
 				clientInfo.playerRole = "p1";
 
-				console.info("joining battle", battleId);
 				socket.join(battleId);
-				console.info("emitting battle_created", { battleId, playerRole: "p1" });
 				socket.emit("server:battle_created", { battleId, playerRole: "p1" });
 				console.log(`[Battle ${battleId}] Waiting for P2 to join.`);
 			} catch (error: unknown) {

@@ -90,7 +90,6 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 		set({ userId, error: null });
 
 		const newSocket = io(SERVER_URL, {
-			transports: ["websocket"],
 			reconnectionAttempts: 5,
 			timeout: 10000,
 		});
