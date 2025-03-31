@@ -104,11 +104,6 @@ io.on("connection", (socket: Socket) => {
 	socket.on(
 		"client:create_battle",
 		(data: { format: string; userId: string }) => {
-			socket.emit("server:battle_created", {
-				battleId: "123",
-				playerRole: "p1",
-			});
-			return;
 			const clientInfo = getClientInfo(socket.id);
 			if (!clientInfo || clientInfo.userId !== data.userId) {
 				socket.emit("server:error", {
