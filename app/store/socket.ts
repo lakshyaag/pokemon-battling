@@ -40,6 +40,7 @@ interface ClientToServerEvents {
 	"client:decision": (data: {
 		battleId: string;
 		decision: PlayerDecision | null;
+		forceSwitch?: boolean;
 	}) => void;
 	"client:leave_battle": (data: { battleId: string }) => void;
 	// Add other events as needed

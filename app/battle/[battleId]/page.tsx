@@ -216,7 +216,11 @@ export default function BattlePage() {
 		if (!battleId || !playerRole || winner !== undefined) return;
 
 		console.log(`[Battle ${battleId}] Sending decision:`, decision);
-		emit("client:decision", { battleId, decision });
+		emit("client:decision", {
+			battleId,
+			decision,
+			forceSwitch: playerRequest?.forceSwitch?.[0],
+		});
 	};
 
 	const handleReturnHome = () => {

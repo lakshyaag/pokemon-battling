@@ -430,7 +430,11 @@ io.on("connection", (socket: Socket) => {
 
 	socket.on(
 		"client:decision",
-		(data: { battleId: string; decision: PlayerDecision }) => {
+		(data: {
+			battleId: string;
+			decision: PlayerDecision;
+			forceSwitch?: boolean;
+		}) => {
 			const clientInfo = getClientInfo(socket.id);
 			const battleRoom = getBattleRoom(data.battleId);
 
@@ -470,6 +474,31 @@ io.on("connection", (socket: Socket) => {
 					battleRoom.p1Decision = data.decision;
 				} else {
 					battleRoom.p2Decision = data.decision;
+				}
+
+				if (data.forceSwitch) {
+					console.log(
+						`[Battle ${data.battleId}] Force switching due to forceSwitch flag.`,
+					);
+
+					if (battleRoom.p1Decision) {
+						battleManager.makePlayerMove(
+							data.battleId,
+							"p1",
+							battleRoom.p1Decision,
+						);
+					}
+					if (battleRoom.p2Decision) {
+						battleManager.makePlayerMove(
+							data.battleId,
+							"p2",
+							battleRoom.p2Decision,
+						);
+					}
+
+					// Reset decisions for next turn
+					battleRoom.p1Decision = null;
+					battleRoom.p2Decision = null;
 				}
 
 				if (battleRoom.p1Decision && battleRoom.p2Decision) {
