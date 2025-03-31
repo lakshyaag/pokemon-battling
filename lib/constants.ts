@@ -1,5 +1,4 @@
 import type { GraphicsGen } from "@pkmn/img";
-import { PRNG } from "@pkmn/sim";
 import type { GenerationNum, TypeName } from "@pkmn/types";
 
 const SPRITES: { [gen in GenerationNum]: GraphicsGen } = {
@@ -13,6 +12,8 @@ const SPRITES: { [gen in GenerationNum]: GraphicsGen } = {
 	8: "ani",
 	9: "ani",
 };
+
+export const generation = 3;
 
 export const getFormat = (generation: GenerationNum) =>
 	`gen${generation}randombattle`;

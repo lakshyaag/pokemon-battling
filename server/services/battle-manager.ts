@@ -20,7 +20,7 @@ export class BattleManager {
 		}
 
 		// Create new battle engine
-		const battleEngine = new BattleEngine(options);
+		const battleEngine = new BattleEngine(battleId, options);
 
 		// Store in battles map
 		this.battles.set(battleId, battleEngine);
@@ -52,7 +52,12 @@ export class BattleManager {
 	 * @returns True if battle was removed, false if not found
 	 */
 	removeBattle(battleId: string): boolean {
-		return this.battles.delete(battleId);
+		const engine = this.battles.get(battleId);
+		if (engine) {
+			engine.destroy();
+			return this.battles.delete(battleId);
+		}
+		return false;
 	}
 
 	/**

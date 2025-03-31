@@ -1,0 +1,30 @@
+{
+  "name": "server",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist",
+    "serve": "bun run dist/index.js"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@pkmn/data": "^0.9.32",
+    "@pkmn/dex": "^0.9.32",
+    "@pkmn/protocol": "^0.6.32",
+    "@pkmn/randoms": "^0.9.32",
+    "@pkmn/sim": "^0.9.32",
+    "@pkmn/streams": "^1.1.0",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.14",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}

@@ -5,9 +5,8 @@ import { Badge } from "./ui/badge";
 import { parseCondition, getHPColor } from "@/utils/pokemonUtils";
 import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Sprites } from "@pkmn/img";
-import { useSettings } from "@/store/settings";
-import { getGraphics } from "@/lib/constants";
-import type { PlayerRequest } from "@/services/battle-types";
+import { generation, getGraphics } from "@/lib/constants";
+import type { PlayerRequest } from "@/lib/battle-types";
 import type { GenderName } from "@pkmn/types";
 
 type PokemonInfo = NonNullable<PlayerRequest["side"]["pokemon"][number]>;
@@ -25,12 +24,10 @@ export default function SwitchButton({
 	disabled,
 	isSelected,
 }: SwitchButtonProps) {
-	const { generation } = useSettings();
 	const graphics = getGraphics(generation);
 
 	// Extract basic info
 
-	console.log(pokemonInfo);
 	const name = pokemonInfo.details.split(",")[0].replace(/-.+$/, "");
 	const level = pokemonInfo.details.match(/, L(\d+)/)?.[1] || "100";
 	const gender = pokemonInfo.details.includes(", M")
