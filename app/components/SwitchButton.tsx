@@ -5,8 +5,7 @@ import { Badge } from "./ui/badge";
 import { parseCondition, getHPColor } from "@/utils/pokemonUtils";
 import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Sprites } from "@pkmn/img";
-import { useSettings } from "@/store/settings";
-import { getGraphics } from "@/lib/constants";
+import { generation, getGraphics } from "@/lib/constants";
 import type { PlayerRequest } from "@/lib/battle-types";
 import type { GenderName } from "@pkmn/types";
 
@@ -25,7 +24,6 @@ export default function SwitchButton({
 	disabled,
 	isSelected,
 }: SwitchButtonProps) {
-	const { generation } = useSettings();
 	const graphics = getGraphics(generation);
 
 	// Extract basic info

@@ -10,16 +10,16 @@ import {
 } from "@/components/ui/card";
 import { ArrowRight, Dices, Loader2, LogIn } from "lucide-react";
 import { useSocketStore } from "@/store/socket";
-import { useSettings } from "@/store/settings";
+
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { getFormat } from "@/lib/constants";
+import { generation, getFormat } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function Home() {
 	const { isConnected, socket, userId, emit } = useSocketStore();
-	const { generation } = useSettings();
+	
 	const router = useRouter();
 	const [isCreatingBattle, setIsCreatingBattle] = useState(false);
 	const [isJoiningBattle, setIsJoiningBattle] = useState(false);
@@ -46,17 +46,6 @@ export default function Home() {
 			router.push(`/battle/${data.battleId}`);
 		};
 
-		const handleBattleJoined = (data: {
-			battleId: string;
-			playerRole: "p1" | "p2";
-			opponentUserId?: string;
-		}) => {
-			console.log("Received server:battle_joined", data);
-			if (joinTimeoutRef.current) clearTimeout(joinTimeoutRef.current);
-			setIsJoiningBattle(false);
-			router.push(`/battle/${data.battleId}`);
-		};
-
 		const handleError = (data: { message: string }) => {
 			console.error("Received server error:", data.message);
 			setError(`Operation failed: ${data.message}`);
@@ -71,19 +60,25 @@ export default function Home() {
 		};
 
 		socket.on("server:battle_created", handleBattleCreated);
-		socket.on("server:battle_joined", handleBattleJoined);
+
 		socket.on("server:error", handleError);
 
 		return () => {
 			cleanupTimeouts();
 			socket.off("server:battle_created", handleBattleCreated);
-			socket.off("server:battle_joined", handleBattleJoined);
 			socket.off("server:error", handleError);
 		};
 	}, [socket, router, isCreatingBattle, isJoiningBattle]);
 
 	const handleCreateRandomBattle = () => {
-		if (!isConnected || !userId || !socket || isCreatingBattle || isJoiningBattle) return;
+		if (
+			!isConnected ||
+			!userId ||
+			!socket ||
+			isCreatingBattle ||
+			isJoiningBattle
+		)
+			return;
 
 		setError(null);
 		setIsCreatingBattle(true);
@@ -94,7 +89,7 @@ export default function Home() {
 
 		if (createTimeoutRef.current) clearTimeout(createTimeoutRef.current);
 		createTimeoutRef.current = setTimeout(() => {
-			setIsCreatingBattle(current => {
+			setIsCreatingBattle((current) => {
 				if (current) {
 					setError("Server did not respond to battle creation request.");
 					return false;
@@ -105,9 +100,19 @@ export default function Home() {
 	};
 
 	const handleJoinBattle = () => {
-		if (!isConnected || !userId || !socket || !joinBattleId.trim() || isCreatingBattle || isJoiningBattle) {
+		if (
+			!isConnected ||
+			!userId ||
+			!socket ||
+			!joinBattleId.trim() ||
+			isCreatingBattle ||
+			isJoiningBattle
+		) {
 			if (!joinBattleId.trim()) setError("Please enter a Battle ID to join.");
-			else setError("Cannot join battle now (check connection or ongoing actions).");
+			else
+				setError(
+					"Cannot join battle now (check connection or ongoing actions).",
+				);
 			return;
 		}
 
@@ -115,18 +120,8 @@ export default function Home() {
 		setIsJoiningBattle(true);
 		const battleIdToJoin = joinBattleId.trim();
 		console.log(`Requesting to join battle ${battleIdToJoin}...`);
-		emit("client:join_battle", { battleId: battleIdToJoin, userId });
 
-		if (joinTimeoutRef.current) clearTimeout(joinTimeoutRef.current);
-		joinTimeoutRef.current = setTimeout(() => {
-			setIsJoiningBattle(current => {
-				if (current) {
-					setError("Server did not respond to join battle request.");
-					return false;
-				}
-				return current;
-			});
-		}, 15000);
+		router.push(`/battle/${battleIdToJoin}`);
 	};
 
 	return (
@@ -140,7 +135,9 @@ export default function Home() {
 						Experience thrilling Pokemon battles!
 					</p>
 					{!isConnected && (
-						<p className="text-yellow-600 animate-pulse">Connecting to server...</p>
+						<p className="text-yellow-600 animate-pulse">
+							Connecting to server...
+						</p>
 					)}
 					{error && <p className="text-destructive font-medium">{error}</p>}
 				</div>
@@ -167,9 +164,16 @@ export default function Home() {
 								disabled={!isConnected || isCreatingBattle || isJoiningBattle}
 							>
 								{isCreatingBattle ? (
-									<> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating... </>
+									<>
+										{" "}
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+										Creating...{" "}
+									</>
 								) : (
-									<> Create Battle <ArrowRight className="ml-2 w-4 h-4" /> </>
+									<>
+										{" "}
+										Create Battle <ArrowRight className="ml-2 w-4 h-4" />{" "}
+									</>
 								)}
 							</Button>
 						</CardFooter>
@@ -184,10 +188,14 @@ export default function Home() {
 						</CardHeader>
 						<CardContent className="space-y-3">
 							<p className="text-muted-foreground">
-								Enter the ID of a battle created by someone else to join as Player 2.
+								Enter the ID of a battle created by someone else to join as
+								Player 2.
 							</p>
 							<div>
-								<Label htmlFor="battleIdInput" className="mb-1.5 block text-sm font-medium">
+								<Label
+									htmlFor="battleIdInput"
+									className="mb-1.5 block text-sm font-medium"
+								>
 									Battle ID
 								</Label>
 								<Input
@@ -206,12 +214,23 @@ export default function Home() {
 								className="w-full"
 								size="lg"
 								onClick={handleJoinBattle}
-								disabled={!isConnected || !joinBattleId.trim() || isJoiningBattle || isCreatingBattle}
+								disabled={
+									!isConnected ||
+									!joinBattleId.trim() ||
+									isJoiningBattle ||
+									isCreatingBattle
+								}
 							>
 								{isJoiningBattle ? (
-									<> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Joining... </>
+									<>
+										{" "}
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" /> Joining...{" "}
+									</>
 								) : (
-									<> Join Battle <LogIn className="ml-2 w-4 h-4" /> </>
+									<>
+										{" "}
+										Join Battle <LogIn className="ml-2 w-4 h-4" />{" "}
+									</>
 								)}
 							</Button>
 						</CardFooter>

@@ -5,7 +5,7 @@ import BattleView from "@/components/BattleView";
 import { Button } from "@/components/ui/button";
 import { useRouter, useParams } from "next/navigation";
 import { useSocketStore } from "@/store/socket";
-import { useSettings } from "@/store/settings";
+
 import type {
 	PlayerDecision,
 	PlayerId,
@@ -25,7 +25,6 @@ export default function BattlePage() {
 	const params = useParams();
 	const battleId = params.battleId as string;
 
-	const { generation } = useSettings();
 	const { socket, userId, emit, isConnected } = useSocketStore();
 
 	// Client-side Battle State
@@ -241,7 +240,7 @@ export default function BattlePage() {
 		);
 	}
 
-	if (loadingMessage || !clientBattleState || !playerRole) {
+	if (!clientBattleState || !playerRole) {
 		return (
 			<div className="container mx-auto py-8 text-center">
 				<h1 className="text-3xl font-bold mb-4">Pokémon Battle</h1>

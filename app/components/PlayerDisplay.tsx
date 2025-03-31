@@ -16,7 +16,7 @@ import { getSprite, parseCondition, getHPColor } from "@/utils/pokemonUtils";
 import { getStatusClass, getStatusName } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dex } from "@pkmn/sim";
-import { useSettings } from "@/store/settings";
+import { generation } from "@/lib/constants";
 
 interface PlayerDisplayProps {
 	player: "p1" | "p2";
@@ -29,9 +29,7 @@ interface PlayerDisplayProps {
 }
 
 // Initialize Dex for local data lookups
-const localDex = Dex.forFormat(
-	`gen${useSettings.getState().generation}randombattle`,
-);
+const localDex = Dex.forFormat(`gen${generation}randombattle`);
 
 export default function PlayerDisplay({
 	player,

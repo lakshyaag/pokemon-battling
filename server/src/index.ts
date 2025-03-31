@@ -25,7 +25,6 @@ const io = new Server(server, {
 	},
 	pingInterval: 5000,
 	pingTimeout: 10000,
-
 });
 
 const PORT = process.env.PORT || 8080;
@@ -146,6 +145,11 @@ io.on("connection", (socket: Socket) => {
 					const battleRoom = getBattleRoom(battleId);
 					if (!battleRoom?.started) return;
 
+					console.log(`[Battle ${battleId}] Received protocol event:`, {
+						type,
+						lines,
+					});
+
 					if (type === "omniscient") {
 						io.to(battleId).emit("server:protocol", { battleId, lines });
 					} else {
@@ -204,9 +208,9 @@ io.on("connection", (socket: Socket) => {
 				clientInfo.currentBattleId = battleId;
 				clientInfo.playerRole = "p1";
 
-				console.info('joining battle', battleId)
+				console.info("joining battle", battleId);
 				socket.join(battleId);
-				console.info('emitting battle_created', { battleId, playerRole: "p1" })
+				console.info("emitting battle_created", { battleId, playerRole: "p1" });
 				socket.emit("server:battle_created", { battleId, playerRole: "p1" });
 				console.log(`[Battle ${battleId}] Waiting for P2 to join.`);
 			} catch (error: unknown) {
@@ -240,14 +244,18 @@ io.on("connection", (socket: Socket) => {
 					`[Socket ${socket.id}] User ${clientInfo.userId} rejoining battle ${battleId}.`,
 				);
 				socket.join(battleId);
-				socket.emit("server:battle_joined", {
-					battleId,
-					playerRole: clientInfo.playerRole,
-					opponentUserId:
-						clientInfo.playerRole === "p1"
-							? battleRoom.p2?.userId
-							: battleRoom.p1?.userId,
-				});
+
+				// Add timeout to test race condition
+				setTimeout(() => {
+					socket.emit("server:battle_joined", {
+						battleId,
+						playerRole: clientInfo.playerRole,
+						opponentUserId:
+							clientInfo.playerRole === "p1"
+								? battleRoom.p2?.userId
+								: battleRoom.p1?.userId,
+					});
+				}, 1000);
 
 				const engine = battleManager.getBattle(battleId);
 				if (engine && battleRoom.started) {
