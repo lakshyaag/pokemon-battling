@@ -145,11 +145,6 @@ io.on("connection", (socket: Socket) => {
 					const battleRoom = getBattleRoom(battleId);
 					if (!battleRoom?.started) return;
 
-					console.log(`[Battle ${battleId}] Received protocol event:`, {
-						type,
-						lines,
-					});
-
 					if (type === "omniscient") {
 						io.to(battleId).emit("server:protocol", { battleId, lines });
 					} else {
