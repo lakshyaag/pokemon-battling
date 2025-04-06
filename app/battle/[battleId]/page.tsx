@@ -208,6 +208,7 @@ export default function BattlePage() {
 						{
 							duration: 1 * 60 * 1000,
 							dismissible: true,
+							closeButton: true,
 						},
 					);
 				}
@@ -231,6 +232,7 @@ export default function BattlePage() {
 				toast.success("Opponent reconnected. Continuing battle...", {
 					duration: 1 * 60 * 1000,
 					dismissible: true,
+					closeButton: true,
 				});
 			}
 		};
