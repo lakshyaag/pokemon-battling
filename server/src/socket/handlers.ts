@@ -1,13 +1,16 @@
 import type { Server, Socket } from "socket.io";
 import { randomUUID } from "node:crypto";
 import { battleManager } from "../../services/battle-manager-instance";
-import type { BattleOptions, PlayerDecision } from "../../services/battle-types";
-import { 
-	getClientInfo, 
-	addClient, 
-	removeClient, 
+import type {
+	BattleOptions,
+	PlayerDecision,
+} from "../../services/battle-types";
+import {
+	getClientInfo,
+	addClient,
+	removeClient,
 	getClientByUserId,
-	updateClientInfo
+	updateClientInfo,
 } from "../handlers/client-manager";
 import {
 	getBattleRoom,
@@ -16,13 +19,13 @@ import {
 	handlePlayerReconnect,
 	clearDisconnectTimer,
 	setupDisconnectTimer,
-	handlePlayerDecision
+	handlePlayerDecision,
 } from "../handlers/battle-manager";
-import { 
-	createBattleInDB, 
-	updateBattleInDB, 
+import {
+	createBattleInDB,
+	updateBattleInDB,
 	deleteBattleFromDB,
-	getBattleFromDB
+	getBattleFromDB,
 } from "../db/battle-db";
 import type { BattleRoom } from "../types";
 
@@ -98,9 +101,9 @@ export function setupSocketHandlers(io: Server): void {
 						clientInfo.userId,
 						socket.id,
 						p1Name,
-						p2Name
+						p2Name,
 					);
-					
+
 					if (!success) {
 						throw new Error("Database error: Failed to create battle");
 					}
@@ -126,7 +129,9 @@ export function setupSocketHandlers(io: Server): void {
 							io.to(battleId).emit("server:protocol", { battleId, lines });
 						} else {
 							const targetSocketId =
-								type === "p1" ? battleRoom.p1?.socketId : battleRoom.p2?.socketId;
+								type === "p1"
+									? battleRoom.p1?.socketId
+									: battleRoom.p2?.socketId;
 							if (targetSocketId) {
 								io.to(targetSocketId).emit("server:protocol", {
 									battleId,
@@ -143,11 +148,14 @@ export function setupSocketHandlers(io: Server): void {
 
 						// Save request to database
 						await updateBattleInDB(battleId, {
-							[player === "p1" ? "p1_last_request" : "p2_last_request"]: request,
+							[player === "p1" ? "p1_last_request" : "p2_last_request"]:
+								request,
 						});
 
 						const targetSocketId =
-							player === "p1" ? battleRoom.p1?.socketId : battleRoom.p2?.socketId;
+							player === "p1"
+								? battleRoom.p1?.socketId
+								: battleRoom.p2?.socketId;
 						if (targetSocketId) {
 							const requestLine = `|request|${JSON.stringify(request)}`;
 							io.to(targetSocketId).emit("server:protocol", {
@@ -167,20 +175,22 @@ export function setupSocketHandlers(io: Server): void {
 						console.log(`[Battle ${battleId}] Battle ended. Winner: ${winner}`);
 
 						battleRoom.started = false;
-						
+
 						// Update database
 						await updateBattleInDB(battleId, {
 							status: "finished",
 							winner: winner,
 						});
-						
+
 						// Cleanup handled by manager's timeout
 					});
 
 					// Wire up battle start
 					battleEngine.on("battleStart", async ({ battleId, initialLines }) => {
-						console.log(`[Battle ${battleId}] Battle started. Saving initial protocol lines.`);
-						
+						console.log(
+							`[Battle ${battleId}] Battle started. Saving initial protocol lines.`,
+						);
+
 						// Save initial protocol lines to database
 						await updateBattleInDB(battleId, {
 							initial_protocol_lines: initialLines,
@@ -213,7 +223,7 @@ export function setupSocketHandlers(io: Server): void {
 						message: `Failed to create battle: ${error instanceof Error ? error.message : String(error)}`,
 					});
 					battleManager.removeBattle(battleId);
-					
+
 					// Also remove from database if there was an error
 					await deleteBattleFromDB(battleId);
 				}
@@ -236,7 +246,7 @@ export function setupSocketHandlers(io: Server): void {
 
 				// Get battle info first from database directly to handle reconnections properly
 				const battleData = await getBattleFromDB(battleId);
-				
+
 				if (!battleData) {
 					socket.emit("server:error", {
 						message: `Battle with ID ${battleId} not found.`,
@@ -245,56 +255,70 @@ export function setupSocketHandlers(io: Server): void {
 				}
 
 				const battleRoom = await getBattleRoom(battleId);
-				
+
 				// --- Handle Reconnection Logic ---
 				// Check if user is one of the players in this battle based on database record
 				const isP1 = battleData.p1_user_id === clientInfo.userId;
 				const isP2 = battleData.p2_user_id === clientInfo.userId;
-				
+
 				if (isP1 || isP2) {
 					// User is reconnecting to an existing battle
 					console.log(
-						`[Socket ${socket.id}] User ${clientInfo.userId} reconnecting to battle ${battleId} as ${isP1 ? 'p1' : 'p2'}.`,
+						`[Socket ${socket.id}] User ${clientInfo.userId} reconnecting to battle ${battleId} as ${isP1 ? "p1" : "p2"}.`,
 					);
-					
+
 					// Update client info & join socket room
-					await handlePlayerReconnect(socket, clientInfo, battleId, battleRoom, battleData, isP1);
-					
+					await handlePlayerReconnect(
+						socket,
+						clientInfo,
+						battleId,
+						battleRoom,
+						battleData,
+						isP1,
+					);
+
 					// Clear any pending disconnect timer
 					if (battleRoom) {
 						clearDisconnectTimer(battleRoom, isP1, battleId);
 					}
-					
+
 					// Notify opponent about reconnection if they're connected
 					const opponentSocketId = isP1
 						? battleRoom?.p2?.socketId
 						: battleRoom?.p1?.socketId;
-					
+
 					if (opponentSocketId) {
 						// Notify opponent more explicitly about reconnection and send it to the entire room
 						io.to(opponentSocketId).emit("server:opponent_reconnected", {
 							battleId,
 							userId: clientInfo.userId,
 							message: `Your opponent (${clientInfo.userId}) has reconnected.`,
-							temporary: false  // Indicate this is a permanent reconnection
+							temporary: false, // Indicate this is a permanent reconnection
 						});
 					}
-					
+
 					// Instead of just notifying the client, broadcast the battle_joined event to all in the room
 					socket.emit("server:battle_joined", {
 						battleId,
 						playerRole: isP1 ? "p1" : "p2",
-						opponentUserId: isP1 ? battleData.p2_user_id : battleData.p1_user_id,
+						opponentUserId: isP1
+							? battleData.p2_user_id
+							: battleData.p1_user_id,
 						reconnected: true,
 					});
-					
+
 					// Get battle engine or recreate if needed
 					const engine = battleManager.getBattle(battleId);
-					
+
 					if (engine && battleData.status === "active") {
 						// Send initial protocol lines first if available
-						if (battleData.initial_protocol_lines && battleData.initial_protocol_lines.length > 0) {
-							console.log(`[Battle ${battleId}] Sending initial protocol data to reconnecting player ${isP1 ? 'p1' : 'p2'}`);
+						if (
+							battleData.initial_protocol_lines &&
+							battleData.initial_protocol_lines.length > 0
+						) {
+							console.log(
+								`[Battle ${battleId}] Sending initial protocol data to reconnecting player ${isP1 ? "p1" : "p2"}`,
+							);
 							io.to(socket.id).emit("server:protocol", {
 								battleId,
 								lines: battleData.initial_protocol_lines,
@@ -303,14 +327,16 @@ export function setupSocketHandlers(io: Server): void {
 							// Fallback if no initial lines in DB - get from engine if available
 							const initialLines = engine.getInitialProtocolLines();
 							if (initialLines.length > 0) {
-								console.log(`[Battle ${battleId}] Sending engine's initial protocol data to reconnecting player ${isP1 ? 'p1' : 'p2'}`);
+								console.log(
+									`[Battle ${battleId}] Sending engine's initial protocol data to reconnecting player ${isP1 ? "p1" : "p2"}`,
+								);
 								io.to(socket.id).emit("server:protocol", {
 									battleId,
 									lines: initialLines,
 								});
 							}
 						}
-						
+
 						// Battle is active, send current game state
 						const lastRequest = isP1
 							? battleData.p1_last_request
@@ -319,7 +345,7 @@ export function setupSocketHandlers(io: Server): void {
 							: battleData.p2_last_request
 								? battleData.p2_last_request
 								: engine.getP2Request();
-						
+
 						if (lastRequest) {
 							const requestLine = `|request|${JSON.stringify(lastRequest)}`;
 							io.to(socket.id).emit("server:protocol", {
@@ -330,7 +356,7 @@ export function setupSocketHandlers(io: Server): void {
 								`[Battle ${battleId}] Re-sent request to reconnected ${isP1 ? "p1" : "p2"}`,
 							);
 						}
-						
+
 						// If battle exists in memory but not started, make sure it's marked as started
 						if (
 							battleRoom &&
@@ -342,18 +368,18 @@ export function setupSocketHandlers(io: Server): void {
 					} else if (battleData.status === "active" && !engine) {
 						// Battle is marked active in DB but engine not found
 						// This is a case where server restarted but battle data exists
-						
+
 						socket.emit("server:error", {
 							message:
 								"Battle state could not be fully recovered. Please start a new battle.",
 						});
-						
+
 						// Mark battle as finished since we can't recover it
 						await updateBattleInDB(battleId, {
 							status: "finished",
 							winner: null,
 						});
-						
+
 						// Reset client state
 						updateClientInfo(socket.id, {
 							currentBattleId: undefined,
@@ -366,14 +392,14 @@ export function setupSocketHandlers(io: Server): void {
 							winner: battleData.winner,
 							message: "This battle has already ended.",
 						});
-						
+
 						// Reset client state
 						updateClientInfo(socket.id, {
 							currentBattleId: undefined,
 							playerRole: undefined,
 						});
 					}
-					
+
 					return;
 				}
 
@@ -391,21 +417,21 @@ export function setupSocketHandlers(io: Server): void {
 					});
 					return;
 				}
-				
+
 				if (battleData.status !== "waiting") {
 					socket.emit("server:error", {
 						message: "This battle is no longer accepting new players.",
 					});
 					return;
 				}
-				
+
 				if (battleRoom.p2 !== null || battleData.p2_user_id !== null) {
 					socket.emit("server:error", {
 						message: "This battle is already full.",
 					});
 					return;
 				}
-				
+
 				if (
 					battleRoom.p1?.userId === clientInfo.userId ||
 					battleData.p1_user_id === clientInfo.userId
@@ -425,7 +451,7 @@ export function setupSocketHandlers(io: Server): void {
 					currentBattleId: battleId,
 					playerRole: "p2",
 				});
-				
+
 				// Update database
 				await updateBattleInDB(battleId, {
 					p2_user_id: clientInfo.userId,
@@ -433,7 +459,7 @@ export function setupSocketHandlers(io: Server): void {
 					p2_name: clientInfo.userId,
 					status: "active",
 				});
-				
+
 				const engine = battleManager.getBattle(battleId);
 				engine?.updatePlayerName("p2", clientInfo.userId);
 				socket.join(battleId);
@@ -472,7 +498,7 @@ export function setupSocketHandlers(io: Server): void {
 					if (engine) engine.destroy();
 					battleManager.removeBattle(battleId);
 					removeBattleFromCache(battleId);
-					
+
 					// Update database battle status
 					await updateBattleInDB(battleId, { status: "finished" });
 
@@ -524,7 +550,7 @@ export function setupSocketHandlers(io: Server): void {
 				if (leavingRole === "p1" && battleRoom.p1?.socketId === socket.id) {
 					battleRoom.p1 = null;
 					opponentSocketId = battleRoom.p2?.socketId;
-					
+
 					// Update database
 					await updateBattleInDB(battleId, { p1_socket_id: null });
 				} else if (
@@ -533,7 +559,7 @@ export function setupSocketHandlers(io: Server): void {
 				) {
 					battleRoom.p2 = null;
 					opponentSocketId = battleRoom.p1?.socketId;
-					
+
 					// Update database
 					await updateBattleInDB(battleId, { p2_socket_id: null });
 				}
@@ -542,7 +568,7 @@ export function setupSocketHandlers(io: Server): void {
 					io.to(opponentSocketId).emit("server:opponent_disconnected", {
 						battleId: battleId,
 						message: `Your opponent (${clientInfo.userId}) left the battle.`,
-						temporary: false  // This is a permanent leave, not a temporary disconnect
+						temporary: false, // This is a permanent leave, not a temporary disconnect
 					});
 					const opponentInfo = getClientInfo(opponentSocketId);
 					if (opponentInfo) {
@@ -557,7 +583,7 @@ export function setupSocketHandlers(io: Server): void {
 						);
 						battleManager.removeBattle(battleId);
 						removeBattleFromCache(battleId);
-						
+
 						// Update database
 						await updateBattleInDB(battleId, {
 							status: "finished",
@@ -572,7 +598,7 @@ export function setupSocketHandlers(io: Server): void {
 					);
 					battleManager.removeBattle(battleId);
 					removeBattleFromCache(battleId);
-					
+
 					// Mark as finished in database if not already
 					await updateBattleInDB(battleId, { status: "finished" });
 				}
@@ -621,14 +647,14 @@ export function setupSocketHandlers(io: Server): void {
 					`[Battle ${data.battleId}] Received decision from ${playerRole} (${clientInfo.userId}):`,
 					data.decision,
 				);
-				
+
 				try {
 					await handlePlayerDecision(
-						data.battleId, 
-						playerRole, 
-						data.decision, 
+						data.battleId,
+						playerRole,
+						data.decision,
 						battleRoom,
-						data.forceSwitch
+						data.forceSwitch,
 					);
 				} catch (error) {
 					console.error(
@@ -672,81 +698,77 @@ export function setupSocketHandlers(io: Server): void {
 					if (leavingRole === "p1" && battleRoom.p1?.socketId === socket.id) {
 						battleRoom.p1 = null;
 						opponentSocketId = battleRoom.p2?.socketId;
-						
+
 						// Update database - just mark socket as null but keep battle active
 						await updateBattleInDB(battleId, { p1_socket_id: null });
-						
+
 						// Set a reconnection timer
-						setupDisconnectTimer(
-							battleRoom,
-							battleId,
-							"p1",
-							userId,
-							opponentSocketId,
-							async () => {
-								// Check if battle is still active first
-								const battleData = await getBattleFromDB(battleId);
-								
-								// Only forfeit if battle is still active and player hasn't reconnected
-								if (battleData && battleData.status === "active" && !battleData.p1_socket_id) {
-									// Forfeit the battle
-									battleManager.removeBattle(battleId);
-									removeBattleFromCache(battleId);
-									
-									// Update database
-									await updateBattleInDB(battleId, {
-										status: "finished",
+						setupDisconnectTimer(battleRoom, battleId, "p1", async () => {
+							// Check if battle is still active first
+							const battleData = await getBattleFromDB(battleId);
+
+							// Only forfeit if battle is still active and player hasn't reconnected
+							if (
+								battleData &&
+								battleData.status === "active" &&
+								!battleData.p1_socket_id
+							) {
+								// Forfeit the battle
+								battleManager.removeBattle(battleId);
+								removeBattleFromCache(battleId);
+
+								// Update database
+								await updateBattleInDB(battleId, {
+									status: "finished",
+									winner: "p2",
+								});
+
+								// Notify opponent if still connected
+								if (opponentSocketId) {
+									io.to(opponentSocketId).emit("server:opponent_disconnected", {
+										battleId: battleId,
+										message: `Your opponent (${userId}) did not reconnect within the time limit.`,
 										winner: "p2",
+										temporary: false, // No longer a temporary disconnect
 									});
-									
-									// Notify opponent if still connected
-									if (opponentSocketId) {
-										io.to(opponentSocketId).emit(
-											"server:opponent_disconnected",
-											{
-												battleId: battleId,
-												message: `Your opponent (${userId}) did not reconnect within the time limit.`,
-												winner: "p2",
-												temporary: false  // No longer a temporary disconnect
-											},
-										);
-									}
 								}
 							}
-						);
+						});
 					} else if (
 						leavingRole === "p2" &&
 						battleRoom.p2?.socketId === socket.id
 					) {
 						battleRoom.p2 = null;
 						opponentSocketId = battleRoom.p1?.socketId;
-						
+
 						// Update database - just mark socket as null but keep battle active
 						await updateBattleInDB(battleId, { p2_socket_id: null });
-						
+
 						// Set a reconnection timer
 						setupDisconnectTimer(
 							battleRoom,
 							battleId,
 							"p2",
-							userId,
-							opponentSocketId,
 							async () => {
 								// Check if battle is still active first
 								const battleData = await getBattleFromDB(battleId);
-								
+
 								// Only forfeit if battle is still active and player hasn't reconnected
-								if (battleData && battleData.status === "active" && !battleData.p2_socket_id) {
+								if (
+									battleData &&
+									battleData.status === "active" &&
+									!battleData.p2_socket_id
+								) {
 									// Forfeit the battle
 									battleManager.removeBattle(battleId);
 									removeBattleFromCache(battleId);
-									
+
 									// Update database
 									await updateBattleInDB(battleId, {
 										status: "finished",
 										winner: "p1",
 									});
-									
+
 									// Notify opponent if still connected
 									if (opponentSocketId) {
 										io.to(opponentSocketId).emit(
@@ -755,12 +777,12 @@ export function setupSocketHandlers(io: Server): void {
 												battleId: battleId,
 												message: `Your opponent (${userId}) did not reconnect within the time limit.`,
 												winner: "p1",
-												temporary: false  // No longer a temporary disconnect
+												temporary: false, // No longer a temporary disconnect
 											},
 										);
 									}
 								}
-							}
+							},
 						);
 					}
 
@@ -769,7 +791,7 @@ export function setupSocketHandlers(io: Server): void {
 						io.to(opponentSocketId).emit("server:opponent_disconnected", {
 							battleId: battleId,
 							message: `Your opponent (${userId}) disconnected. Waiting for them to reconnect...`,
-							temporary: true  // Mark disconnect as temporary, expecting reconnect
+							temporary: true, // Mark disconnect as temporary, expecting reconnect
 						});
 					}
 
@@ -778,7 +800,7 @@ export function setupSocketHandlers(io: Server): void {
 						console.log(
 							`[Battle ${battleId}] Both players disconnected. Removing battle.`,
 						);
-						
+
 						// Clear any reconnection timers
 						if (battleRoom.p1DisconnectTimer) {
 							clearTimeout(battleRoom.p1DisconnectTimer);
@@ -788,10 +810,10 @@ export function setupSocketHandlers(io: Server): void {
 							clearTimeout(battleRoom.p2DisconnectTimer);
 							battleRoom.p2DisconnectTimer = undefined;
 						}
-						
+
 						battleManager.removeBattle(battleId);
 						removeBattleFromCache(battleId);
-						
+
 						// Mark as finished in database
 						await updateBattleInDB(battleId, { status: "finished" });
 					}
@@ -806,4 +828,4 @@ export function setupSocketHandlers(io: Server): void {
 			console.error(`[Socket ${socket.id}] Socket error:`, err);
 		});
 	});
-} 
+}

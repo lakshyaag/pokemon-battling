@@ -1,7 +1,18 @@
 import type { Socket } from "socket.io";
 import { battleManager } from "../../services/battle-manager-instance";
-import type { BattleRoom, ClientInfo, PlayerDecision, PlayerId } from "../types";
-import { getBattleFromDB, updateBattleInDB, convertDBBattleToRoom } from "../db/battle-db";
+import type {
+	BattleRoom,
+	ClientInfo,
+	PlayerDecision,
+	PlayerId,
+} from "../types";
+import {
+	getBattleFromDB,
+	updateBattleInDB,
+	convertDBBattleToRoom,
+} from "../db/battle-db";
+
+const RECONNECTION_GRACE_PERIOD = 1 * 60 * 1000; // 1 minute
 
 // In-memory battle cache
 const activeBattles = new Map<string, BattleRoom>();
@@ -10,7 +21,7 @@ const activeBattles = new Map<string, BattleRoom>();
  * Gets a battle room from memory or database
  */
 export async function getBattleRoom(
-	battleId: string
+	battleId: string,
 ): Promise<BattleRoom | undefined> {
 	// First try in-memory cache
 	let battle = activeBattles.get(battleId);
@@ -53,25 +64,25 @@ export function getAllActiveBattles(): BattleRoom[] {
  * Handles a player reconnecting to a battle
  */
 export async function handlePlayerReconnect(
-	socket: Socket, 
+	socket: Socket,
 	clientInfo: ClientInfo,
-	battleId: string, 
+	battleId: string,
 	battleRoom: BattleRoom | undefined,
 	battleData: unknown,
-	isP1: boolean
+	isP1: boolean,
 ): Promise<void> {
 	const playerRole = isP1 ? "p1" : "p2";
 	console.log(
 		`[Socket ${socket.id}] User ${clientInfo.userId} reconnecting to battle ${battleId} as ${playerRole}.`,
 	);
-	
+
 	// Update client info
 	clientInfo.currentBattleId = battleId;
 	clientInfo.playerRole = playerRole;
-	
+
 	// Join socket room
 	socket.join(battleId);
-	
+
 	// Update socket ID in database and memory
 	if (isP1) {
 		await updateBattleInDB(battleId, { p1_socket_id: socket.id });
@@ -93,7 +104,11 @@ export async function handlePlayerReconnect(
 /**
  * Clears a player's disconnect timer
  */
-export function clearDisconnectTimer(battleRoom: BattleRoom, isP1: boolean, battleId: string): void {
+export function clearDisconnectTimer(
+	battleRoom: BattleRoom,
+	isP1: boolean,
+	battleId: string,
+): void {
 	if (isP1 && battleRoom?.p1DisconnectTimer) {
 		clearTimeout(battleRoom.p1DisconnectTimer);
 		battleRoom.p1DisconnectTimer = undefined;
@@ -116,24 +131,23 @@ export function setupDisconnectTimer(
 	battleRoom: BattleRoom,
 	battleId: string,
 	playerId: PlayerId,
-	userId: string,
-	opponentSocketId: string | undefined,
-	timeoutCallback: () => Promise<void>
+	timeoutCallback: () => Promise<void>,
 ): void {
-	const timerKey = playerId === "p1" ? "p1DisconnectTimer" : "p2DisconnectTimer";
-	
+	const timerKey =
+		playerId === "p1" ? "p1DisconnectTimer" : "p2DisconnectTimer";
+
 	if (battleRoom.started && !battleRoom[timerKey]) {
 		battleRoom[timerKey] = setTimeout(
 			async () => {
 				console.log(
 					`[Battle ${battleId}] ${playerId.toUpperCase()} reconnection grace period ended, forfeiting.`,
 				);
-				
+
 				await timeoutCallback();
-				
+
 				battleRoom[timerKey] = undefined;
 			},
-			2 * 60 * 1000, // 2 minutes reconnection window
+			RECONNECTION_GRACE_PERIOD,
 		);
 	}
 }
@@ -146,14 +160,14 @@ export async function handlePlayerDecision(
 	playerRole: PlayerId,
 	decision: PlayerDecision,
 	battleRoom: BattleRoom,
-	forceSwitch = false
+	forceSwitch = false,
 ): Promise<void> {
 	if (playerRole === "p1") {
 		battleRoom.p1Decision = decision;
 	} else {
 		battleRoom.p2Decision = decision;
 	}
-	
+
 	// Update last activity timestamp
 	await updateBattleInDB(battleId, {});
 
@@ -163,18 +177,10 @@ export async function handlePlayerDecision(
 		);
 
 		if (battleRoom.p1Decision) {
-			battleManager.makePlayerMove(
-				battleId,
-				"p1",
-				battleRoom.p1Decision,
-			);
+			battleManager.makePlayerMove(battleId, "p1", battleRoom.p1Decision);
 		}
 		if (battleRoom.p2Decision) {
-			battleManager.makePlayerMove(
-				battleId,
-				"p2",
-				battleRoom.p2Decision,
-			);
+			battleManager.makePlayerMove(battleId, "p2", battleRoom.p2Decision);
 		}
 
 		// Reset decisions for next turn
@@ -184,21 +190,11 @@ export async function handlePlayerDecision(
 	}
 
 	if (battleRoom.p1Decision && battleRoom.p2Decision) {
-		console.log(
-			`[Battle ${battleId}] Both players have made their decisions.`,
-		);
+		console.log(`[Battle ${battleId}] Both players have made their decisions.`);
 
 		// Both players have made their decisions, pass them to the engine
-		battleManager.makePlayerMove(
-			battleId,
-			"p1",
-			battleRoom.p1Decision,
-		);
-		battleManager.makePlayerMove(
-			battleId,
-			"p2",
-			battleRoom.p2Decision,
-		);
+		battleManager.makePlayerMove(battleId, "p1", battleRoom.p1Decision);
+		battleManager.makePlayerMove(battleId, "p2", battleRoom.p2Decision);
 
 		// Reset decisions for next turn
 		battleRoom.p1Decision = null;
@@ -208,4 +204,4 @@ export async function handlePlayerDecision(
 			`[Battle ${battleId}] Waiting for both players to make decisions.`,
 		);
 	}
-} 
+}

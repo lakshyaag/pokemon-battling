@@ -5,6 +5,7 @@ import BattleView from "@/components/BattleView";
 import { Button } from "@/components/ui/button";
 import { useRouter, useParams } from "next/navigation";
 import { useSocketStore } from "@/store/socket";
+import BattleIdSharing from "@/components/BattleIdSharing";
 
 import type {
 	PlayerDecision,
@@ -19,6 +20,7 @@ import { Protocol } from "@pkmn/protocol";
 import { LogFormatter } from "@pkmn/view";
 import { Generations } from "@pkmn/data";
 import { Dex } from "@pkmn/sim";
+import { toast } from "sonner";
 
 export default function BattlePage() {
 	const router = useRouter();
@@ -111,9 +113,12 @@ export default function BattlePage() {
 			setFormattedLogs((prev) => [...prev, ...(currentLogs as string[])]);
 			if (latestRequest !== null) {
 				setPlayerRequest(latestRequest);
-			} else if (playerRole && battleRef.current && 
-					  // @ts-ignore Property access is safe here
-					  battleRef.current[playerRole]?.request?.active === null) {
+			} else if (
+				playerRole &&
+				battleRef.current &&
+				// @ts-ignore Property access is safe here
+				battleRef.current[playerRole]?.request?.active === null
+			) {
 				setPlayerRequest(null);
 			}
 
@@ -187,14 +192,24 @@ export default function BattlePage() {
 		}) => {
 			if (data.battleId === battleId) {
 				console.log(`[Battle ${battleId}] Opponent disconnected.`);
-				
+
 				// Only set error if this is not a temporary disconnect
 				if (!data.temporary) {
 					setError(data.message);
 					setWinner("Opponent disconnected");
 				} else {
 					// For temporary disconnects, just show a message without ending the battle
-					setLoadingMessage(data.message || "Opponent disconnected. Waiting for reconnection...");
+					setLoadingMessage(
+						data.message ||
+							"Opponent disconnected. Waiting for reconnection...",
+					);
+					toast.info(
+						"Your opponent has disconnected. Waiting for them to reconnect...",
+						{
+							duration: 1 * 60 * 1000,
+							dismissible: true,
+						},
+					);
 				}
 			}
 		};
@@ -205,11 +220,18 @@ export default function BattlePage() {
 			userId: string;
 		}) => {
 			if (data.battleId === battleId) {
-				console.log(`[Battle ${battleId}] Opponent reconnected: ${data.userId}`);
+				console.log(
+					`[Battle ${battleId}] Opponent reconnected: ${data.userId}`,
+				);
 				// Clear any error or disconnect messages
 				setError(null);
 				setWinner(undefined); // Reset the winner state to continue the battle
 				setLoadingMessage(""); // Clear any loading message
+
+				toast.success("Opponent reconnected. Continuing battle...", {
+					duration: 1 * 60 * 1000,
+					dismissible: true,
+				});
 			}
 		};
 
@@ -250,7 +272,9 @@ export default function BattlePage() {
 
 	const handleReturnHome = () => {
 		if (battleId && isConnected) {
-			console.log(`[Battle ${battleId}] Manually leaving battle by clicking Return to Home`);
+			console.log(
+				`[Battle ${battleId}] Manually leaving battle by clicking Return to Home`,
+			);
 			emit("client:leave_battle", { battleId });
 		}
 		router.push("/");
@@ -274,10 +298,14 @@ export default function BattlePage() {
 		return (
 			<div className="container mx-auto py-8 text-center">
 				<h1 className="text-3xl font-bold mb-4">Pokémon Battle</h1>
-				<Card className="mx-auto max-w-xs mt-10">
+				<Card className="mx-auto max-w-md mt-10">
 					<CardContent className="p-6">
-						<div className="text-center text-muted-foreground animate-pulse">
+						<div className="text-center text-muted-foreground">
 							{loadingMessage || "Loading Battle..."}
+
+							{loadingMessage === "Waiting for opponent..." && (
+								<BattleIdSharing battleId={battleId} />
+							)}
 						</div>
 					</CardContent>
 				</Card>
