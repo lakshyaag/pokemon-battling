@@ -13,7 +13,7 @@ const SPRITES: { [gen in GenerationNum]: GraphicsGen } = {
 	9: "ani",
 };
 
-export const generation = 3;
+export const generation = 4;
 
 export const getFormat = (generation: GenerationNum) =>
 	`gen${generation}randombattle`;
