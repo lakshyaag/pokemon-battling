@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SocketProvider } from "./components/SocketProvider";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -37,6 +38,7 @@ export default function RootLayout({
 				<SocketProvider>
 					<TooltipProvider>
 						{children}
+						<Toaster richColors position="bottom-center" />
 						<Analytics />
 					</TooltipProvider>
 				</SocketProvider>
