@@ -78,6 +78,7 @@ export async function updateBattleInDB(
 		last_activity_at: string;
 		p1_last_request: PlayerRequest | null;
 		p2_last_request: PlayerRequest | null;
+		initial_protocol_lines: string[];
 	}>
 ): Promise<boolean> {
 	// Always update the last_activity_at timestamp

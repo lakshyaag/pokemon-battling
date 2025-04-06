@@ -25,7 +25,7 @@ export interface BattleProtocolEventMap extends Record<string, unknown> {
 	protocol: { type: "omniscient" | "p1" | "p2"; lines: string[] };
 	request: { player: "p1" | "p2"; request: PlayerRequest };
 	battleEnd: { winner: string | null };
-	battleStart: { battleId: string };
+	battleStart: { battleId: string; initialLines: string[] };
 }
 
 /**
@@ -47,6 +47,8 @@ export class BattleEngine {
 	private p2Request: PlayerRequest | null = null;
 	private battleId: string;
 	private debug: boolean;
+	private initialProtocolLines: string[] = [];
+	private battleStarted = false;
 
 	constructor(battleId: string, options: BattleOptions) {
 		this.battleId = battleId;
@@ -89,6 +91,17 @@ export class BattleEngine {
 			for await (const chunk of this.streams.omniscient) {
 				const lines = chunk.split("\n").filter((line) => line.length > 0);
 				if (lines.length === 0) continue;
+
+				const containsStartLine = lines.some(line => line === "|start");
+				if (containsStartLine && !this.battleStarted) {
+					this.initialProtocolLines.push(...lines);
+					this.battleStarted = true;
+					
+					this.eventEmitter.emit("battleStart", { 
+						battleId: this.battleId,
+						initialLines: this.initialProtocolLines
+					});
+				}
 
 				for (const line of lines) {
 					try {
@@ -190,7 +203,7 @@ export class BattleEngine {
 >player p1 ${JSON.stringify(p1spec)}
 >player p2 ${JSON.stringify(p2spec)}`);
 
-		this.eventEmitter.emit("battleStart", { battleId: this.battleId });
+		this.eventEmitter.emit("battleStart", { battleId: this.battleId, initialLines: this.initialProtocolLines });
 	}
 
 	processPlayerDecision(player: "p1" | "p2", decision: PlayerDecision): void {
@@ -266,5 +279,9 @@ export class BattleEngine {
 			/* ignore */
 		}
 		this.eventEmitter.removeAllListeners();
+	}
+
+	getInitialProtocolLines(): string[] {
+		return [...this.initialProtocolLines];
 	}
 }

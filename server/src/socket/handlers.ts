@@ -177,6 +177,16 @@ export function setupSocketHandlers(io: Server): void {
 						// Cleanup handled by manager's timeout
 					});
 
+					// Wire up battle start
+					battleEngine.on("battleStart", async ({ battleId, initialLines }) => {
+						console.log(`[Battle ${battleId}] Battle started. Saving initial protocol lines.`);
+						
+						// Save initial protocol lines to database
+						await updateBattleInDB(battleId, {
+							initial_protocol_lines: initialLines,
+						});
+					});
+
 					const newBattleRoom: BattleRoom = {
 						battleId,
 						p1: { socketId: socket.id, userId: clientInfo.userId },
@@ -242,7 +252,12 @@ export function setupSocketHandlers(io: Server): void {
 				const isP2 = battleData.p2_user_id === clientInfo.userId;
 				
 				if (isP1 || isP2) {
-					// Handle player reconnection
+					// User is reconnecting to an existing battle
+					console.log(
+						`[Socket ${socket.id}] User ${clientInfo.userId} reconnecting to battle ${battleId} as ${isP1 ? 'p1' : 'p2'}.`,
+					);
+					
+					// Update client info & join socket room
 					await handlePlayerReconnect(socket, clientInfo, battleId, battleRoom, battleData, isP1);
 					
 					// Clear any pending disconnect timer
@@ -256,14 +271,16 @@ export function setupSocketHandlers(io: Server): void {
 						: battleRoom?.p1?.socketId;
 					
 					if (opponentSocketId) {
+						// Notify opponent more explicitly about reconnection and send it to the entire room
 						io.to(opponentSocketId).emit("server:opponent_reconnected", {
 							battleId,
 							userId: clientInfo.userId,
 							message: `Your opponent (${clientInfo.userId}) has reconnected.`,
+							temporary: false  // Indicate this is a permanent reconnection
 						});
 					}
 					
-					// Notify client about successful reconnection
+					// Instead of just notifying the client, broadcast the battle_joined event to all in the room
 					socket.emit("server:battle_joined", {
 						battleId,
 						playerRole: isP1 ? "p1" : "p2",
@@ -275,6 +292,25 @@ export function setupSocketHandlers(io: Server): void {
 					const engine = battleManager.getBattle(battleId);
 					
 					if (engine && battleData.status === "active") {
+						// Send initial protocol lines first if available
+						if (battleData.initial_protocol_lines && battleData.initial_protocol_lines.length > 0) {
+							console.log(`[Battle ${battleId}] Sending initial protocol data to reconnecting player ${isP1 ? 'p1' : 'p2'}`);
+							io.to(socket.id).emit("server:protocol", {
+								battleId,
+								lines: battleData.initial_protocol_lines,
+							});
+						} else {
+							// Fallback if no initial lines in DB - get from engine if available
+							const initialLines = engine.getInitialProtocolLines();
+							if (initialLines.length > 0) {
+								console.log(`[Battle ${battleId}] Sending engine's initial protocol data to reconnecting player ${isP1 ? 'p1' : 'p2'}`);
+								io.to(socket.id).emit("server:protocol", {
+									battleId,
+									lines: initialLines,
+								});
+							}
+						}
+						
 						// Battle is active, send current game state
 						const lastRequest = isP1
 							? battleData.p1_last_request
@@ -506,6 +542,7 @@ export function setupSocketHandlers(io: Server): void {
 					io.to(opponentSocketId).emit("server:opponent_disconnected", {
 						battleId: battleId,
 						message: `Your opponent (${clientInfo.userId}) left the battle.`,
+						temporary: false  // This is a permanent leave, not a temporary disconnect
 					});
 					const opponentInfo = getClientInfo(opponentSocketId);
 					if (opponentInfo) {
@@ -670,6 +707,7 @@ export function setupSocketHandlers(io: Server): void {
 												battleId: battleId,
 												message: `Your opponent (${userId}) did not reconnect within the time limit.`,
 												winner: "p2",
+												temporary: false  // No longer a temporary disconnect
 											},
 										);
 									}
@@ -717,6 +755,7 @@ export function setupSocketHandlers(io: Server): void {
 												battleId: battleId,
 												message: `Your opponent (${userId}) did not reconnect within the time limit.`,
 												winner: "p1",
+												temporary: false  // No longer a temporary disconnect
 											},
 										);
 									}
@@ -730,7 +769,7 @@ export function setupSocketHandlers(io: Server): void {
 						io.to(opponentSocketId).emit("server:opponent_disconnected", {
 							battleId: battleId,
 							message: `Your opponent (${userId}) disconnected. Waiting for them to reconnect...`,
-							temporary: true,
+							temporary: true  // Mark disconnect as temporary, expecting reconnect
 						});
 					}
 

@@ -111,7 +111,9 @@ export default function BattlePage() {
 			setFormattedLogs((prev) => [...prev, ...(currentLogs as string[])]);
 			if (latestRequest !== null) {
 				setPlayerRequest(latestRequest);
-			} else if (battleRef.current[playerRole!]?.request?.active === null) {
+			} else if (playerRole && battleRef.current && 
+					  // @ts-ignore Property access is safe here
+					  battleRef.current[playerRole]?.request?.active === null) {
 				setPlayerRequest(null);
 			}
 
@@ -181,12 +183,33 @@ export default function BattlePage() {
 		const handleOpponentDisconnect = (data: {
 			battleId: string;
 			message: string;
+			temporary?: boolean;
 		}) => {
 			if (data.battleId === battleId) {
 				console.log(`[Battle ${battleId}] Opponent disconnected.`);
-				setError(data.message);
-				setWinner("Opponent disconnected");
-				setLoadingMessage("");
+				
+				// Only set error if this is not a temporary disconnect
+				if (!data.temporary) {
+					setError(data.message);
+					setWinner("Opponent disconnected");
+				} else {
+					// For temporary disconnects, just show a message without ending the battle
+					setLoadingMessage(data.message || "Opponent disconnected. Waiting for reconnection...");
+				}
+			}
+		};
+
+		const handleOpponentReconnect = (data: {
+			battleId: string;
+			message: string;
+			userId: string;
+		}) => {
+			if (data.battleId === battleId) {
+				console.log(`[Battle ${battleId}] Opponent reconnected: ${data.userId}`);
+				// Clear any error or disconnect messages
+				setError(null);
+				setWinner(undefined); // Reset the winner state to continue the battle
+				setLoadingMessage(""); // Clear any loading message
 			}
 		};
 
@@ -200,6 +223,7 @@ export default function BattlePage() {
 		socket.on("server:battle_joined", handleBattleJoined);
 		socket.on("server:battle_end", handleBattleEnd);
 		socket.on("server:opponent_disconnected", handleOpponentDisconnect);
+		socket.on("server:opponent_reconnected", handleOpponentReconnect);
 		socket.on("server:error", handleError);
 
 		return () => {
@@ -208,6 +232,7 @@ export default function BattlePage() {
 			socket.off("server:battle_joined", handleBattleJoined);
 			socket.off("server:battle_end", handleBattleEnd);
 			socket.off("server:opponent_disconnected", handleOpponentDisconnect);
+			socket.off("server:opponent_reconnected", handleOpponentReconnect);
 			socket.off("server:error", handleError);
 		};
 	}, [socket, isConnected, battleId, userId, emit, processProtocolLines]);
@@ -225,6 +250,7 @@ export default function BattlePage() {
 
 	const handleReturnHome = () => {
 		if (battleId && isConnected) {
+			console.log(`[Battle ${battleId}] Manually leaving battle by clicking Return to Home`);
 			emit("client:leave_battle", { battleId });
 		}
 		router.push("/");

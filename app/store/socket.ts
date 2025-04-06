@@ -30,6 +30,11 @@ interface ServerToClientEvents {
 		battleId: string;
 		message: string;
 	}) => void;
+	"server:opponent_reconnected": (data: {
+		battleId: string;
+		message: string;
+		userId: string;
+	}) => void;
 }
 
 // Define the shape of the client events data (adjust as needed)

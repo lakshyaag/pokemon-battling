@@ -42,6 +42,7 @@ export interface BattleRecord {
 	created_at: string;
 	p1_last_request: PlayerRequest | null;
 	p2_last_request: PlayerRequest | null;
+	initial_protocol_lines: string[];
 }
 
 // Re-export battle types for convenience
