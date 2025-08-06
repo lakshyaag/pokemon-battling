@@ -4,9 +4,9 @@
   "description": "Pokemon battle client using pkmn packages",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "dev": "bunx vite",
+    "build": "bunx tsc && bunx vite build",
+    "preview": "bunx vite preview"
   },
   "dependencies": {
     "@pkmn/client": "^0.6.20",

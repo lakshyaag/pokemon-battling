@@ -1,0 +1,30 @@
+# Project Preferences and Requirements
+
+## Package Manager
+- **Always use Bun instead of npm** for all operations
+- Commands: `bun install`, `bun run`, `bun add`, etc.
+
+## Development Workflow
+- **Always verify compilation before commits**
+  - Run `bun run build` in server directory
+  - Run `bun run build` in client directory
+  - Ensure both compile without errors
+
+## Testing Commands
+```bash
+# Server compilation check
+cd server && bun run build
+
+# Client compilation check  
+cd client && bun run build
+
+# Run development servers
+cd server && bun run dev  # Terminal 1
+cd client && bun run dev  # Terminal 2
+```
+
+## Important Notes
+- Bun is significantly faster than npm for package installation
+- Bun has built-in TypeScript support
+- Use `bunx` for executing packages (equivalent to `npx`)
+- Bun can run TypeScript files directly without compilation in development

@@ -3,36 +3,41 @@
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm
+- Bun runtime (latest version)
 - TypeScript knowledge
 - Basic understanding of WebSockets
 
 ### Setup Instructions
 
-1. **Install Server Dependencies**
+1. **Install Bun** (if not already installed)
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+2. **Install Server Dependencies**
 ```bash
 cd server
-npm install
+bun install
 ```
 
-2. **Install Client Dependencies**
+3. **Install Client Dependencies**
 ```bash
 cd client
-npm install
+bun install
 ```
 
-3. **Start Development Servers**
+4. **Start Development Servers**
 
 Terminal 1 (Server):
 ```bash
 cd server
-npm run dev
+bun run dev
 ```
 
 Terminal 2 (Client):
 ```bash
 cd client
-npm run dev
+bun run dev
 ```
 
 Visit http://localhost:3000 to see the application.
@@ -296,14 +301,14 @@ describe('BattleUI', () => {
 ## Deployment
 
 ### Server Deployment
-1. Build TypeScript: `npm run build`
+1. Build TypeScript: `bun run build`
 2. Set environment variables:
    - `PORT` - Server port
    - `CLIENT_URL` - Client URL for CORS
-3. Use PM2 or similar for process management
+3. Use PM2 or similar for process management (or run directly with Bun)
 
 ### Client Deployment
-1. Build for production: `npm run build`
+1. Build for production: `bun run build`
 2. Configure WebSocket URL in environment
 3. Deploy to CDN or static hosting
 
@@ -349,8 +354,8 @@ describe('BattleUI', () => {
 ### Common Issues
 
 1. **"Cannot find module '@pkmn/sim'"**
-   - Run `npm install` in the correct directory
-   - Check Node version (18+ required)
+   - Run `bun install` in the correct directory
+   - Ensure Bun is properly installed
 
 2. **WebSocket connection fails**
    - Check server is running

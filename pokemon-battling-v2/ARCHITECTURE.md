@@ -134,7 +134,7 @@ Client UI ← WebSocket ← Server ← Protocol Messages
 ## Technology Stack
 
 ### Server
-- Node.js + TypeScript
+- Bun runtime + TypeScript
 - Express.js (HTTP endpoints)
 - ws (WebSocket library)
 - @pkmn/sim (Battle simulation)
@@ -143,7 +143,7 @@ Client UI ← WebSocket ← Server ← Protocol Messages
 
 ### Client
 - React + TypeScript
-- Vite (Build tool)
+- Vite (Build tool with Bun)
 - @pkmn/client (Battle state)
 - @pkmn/protocol (Protocol parsing)
 - @pkmn/img (Pokemon sprites)

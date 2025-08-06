@@ -43,8 +43,8 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design.
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- npm or yarn
+- Bun runtime (latest version)
+- Node.js 18+ (for compatibility)
 
 ### Installation
 
@@ -57,13 +57,13 @@ cd pokemon-battling-v2
 2. Install server dependencies:
 ```bash
 cd server
-npm install
+bun install
 ```
 
 3. Install client dependencies:
 ```bash
 cd ../client
-npm install
+bun install
 ```
 
 ### Running the Application
@@ -71,13 +71,13 @@ npm install
 1. Start the server (in one terminal):
 ```bash
 cd server
-npm run dev
+bun run dev
 ```
 
 2. Start the client (in another terminal):
 ```bash
 cd client
-npm run dev
+bun run dev
 ```
 
 3. Open http://localhost:3000 in your browser
@@ -127,14 +127,14 @@ pokemon-battling-v2/
 ### Available Scripts
 
 #### Server
-- `npm run dev` - Start development server with hot reload
-- `npm run build` - Build for production
-- `npm start` - Start production server
+- `bun run dev` - Start development server with hot reload
+- `bun run build` - Build for production  
+- `bun start` - Start production server
 
 #### Client
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
+- `bun run dev` - Start development server
+- `bun run build` - Build for production
+- `bun run preview` - Preview production build
 
 ## API Reference
 
