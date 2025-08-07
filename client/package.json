@@ -1,0 +1,27 @@
+{
+    "name": "pokemon-battle-client",
+    "version": "1.0.0",
+    "private": true,
+    "dependencies": {
+        "@pkmn/client": "^0.7.0",
+        "@pkmn/dex": "^0.9.38",
+        "@pkmn/img": "^0.2.40",
+        "@pkmn/protocol": "^0.7.0",
+        "@pkmn/sets": "^5.2.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "socket.io-client": "^4.7.2"
+    },
+    "devDependencies": {
+        "@types/react": "^18.2.31",
+        "@types/react-dom": "^18.2.14",
+        "@vitejs/plugin-react": "^4.1.0",
+        "typescript": "^5.2.2",
+        "vite": "^4.4.11"
+    },
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview"
+    }
+}

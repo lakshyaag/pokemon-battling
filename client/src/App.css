@@ -1,0 +1,373 @@
+/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  color: #333;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Button Styles */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #4b5563;
+}
+
+.btn-large {
+  padding: 15px 30px;
+  font-size: 16px;
+}
+
+/* Game Lobby */
+.game-lobby {
+  flex: 1;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.lobby-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.lobby-header h1 {
+  color: white;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-indicator {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.status-indicator.connected {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 2px solid #10b981;
+}
+
+.status-indicator.disconnected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 2px solid #ef4444;
+}
+
+.lobby-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 30px;
+  margin-bottom: 30px;
+}
+
+/* Team Section */
+.team-section {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.team-display h2 {
+  margin-bottom: 20px;
+  color: #374151;
+  font-size: 1.5rem;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.team-display.empty {
+  text-align: center;
+}
+
+.empty-message {
+  color: #6b7280;
+  font-style: italic;
+  padding: 40px;
+}
+
+.team-actions {
+  display: flex;
+  justify-content: center;
+}
+
+/* Pokemon Card */
+.pokemon-card {
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.pokemon-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  border-color: #3b82f6;
+}
+
+.pokemon-image {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.pokemon-image img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.pokemon-info {
+  text-align: center;
+}
+
+.pokemon-name {
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 5px;
+  font-size: 1.1rem;
+}
+
+.pokemon-level {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 5px;
+}
+
+.pokemon-item {
+  color: #8b5cf6;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.pokemon-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.move-tag {
+  background: #f3f4f6;
+  color: #374151;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Battle Section */
+.battle-section {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.player-setup h3 {
+  margin-bottom: 10px;
+  color: #374151;
+}
+
+.player-name-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.2s ease;
+}
+
+.player-name-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.queue-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.queue-status {
+  text-align: center;
+}
+
+.queue-message {
+  color: #059669;
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+/* Instructions */
+.instructions {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.instructions h3 {
+  margin-bottom: 15px;
+  color: #374151;
+}
+
+.instructions ol {
+  padding-left: 20px;
+}
+
+.instructions li {
+  margin-bottom: 8px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+/* Battle View */
+.battle-view {
+  flex: 1;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  margin: 20px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.battle-view h2 {
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+/* Message Log */
+.message-log {
+  background: rgba(255, 255, 255, 0.95);
+  margin: 20px;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.message-log h3 {
+  margin-bottom: 15px;
+  color: #374151;
+}
+
+.messages {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.message {
+  padding: 5px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: #4b5563;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.message:last-child {
+  border-bottom: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .lobby-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .lobby-header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .lobby-header h1 {
+    font-size: 2rem;
+  }
+  
+  .team-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}

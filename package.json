@@ -1,0 +1,25 @@
+{
+    "name": "pokemon-battle-simulator",
+    "version": "1.0.0",
+    "description": "Pokemon battle simulator with websockets using @pkmn packages",
+    "main": "index.js",
+    "scripts": {
+        "dev": "concurrently \"bun run server:dev\" \"bun run client:dev\"",
+        "server:dev": "cd server && bun run dev",
+        "client:dev": "cd client && bun run dev",
+        "install:all": "bun install && cd server && bun install && cd ../client && bun install",
+        "build": "cd client && bun run build",
+        "start": "cd server && bun start"
+    },
+    "keywords": [
+        "pokemon",
+        "battle",
+        "websocket",
+        "simulator"
+    ],
+    "author": "Pokemon Battle Simulator",
+    "license": "MIT",
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
