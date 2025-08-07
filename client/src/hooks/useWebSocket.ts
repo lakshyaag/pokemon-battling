@@ -14,7 +14,7 @@ export const useWebSocket = (url: string, options: UseWebSocketOptions = {}) => 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const optionsRef = useRef(options);
-  
+
   // Update the options ref when options change
   useEffect(() => {
     optionsRef.current = options;
@@ -56,7 +56,7 @@ export const useWebSocket = (url: string, options: UseWebSocketOptions = {}) => 
         console.log('WebSocket disconnected - Code:', event.code, 'Reason:', event.reason, 'Clean:', event.wasClean);
         setIsConnected(false);
         optionsRef.current.onDisconnect?.();
-        
+
         // Only auto-reconnect if it wasn't a clean close (code 1000) and not a manual disconnect
         if (event.code !== 1000 && wsRef.current === ws) {
           console.log('Will attempt to reconnect in 3 seconds...');
@@ -83,7 +83,7 @@ export const useWebSocket = (url: string, options: UseWebSocketOptions = {}) => 
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = undefined;
     }
-    
+
     if (wsRef.current) {
       // Set to null first to prevent reconnection
       const ws = wsRef.current;
@@ -106,12 +106,12 @@ export const useWebSocket = (url: string, options: UseWebSocketOptions = {}) => 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
-    
+
     // Small delay to prevent rapid connection attempts
     const connectTimer = setTimeout(() => {
       connect();
     }, 100);
-    
+
     return () => {
       clearTimeout(connectTimer);
       disconnect();

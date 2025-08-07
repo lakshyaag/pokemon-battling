@@ -14,12 +14,12 @@ export interface GameRoom {
 }
 
 export interface ClientMessage {
-  type: 'create_random_team' | 'join_queue' | 'make_move' | 'leave_queue';
+  type: 'create_random_team' | 'join_queue' | 'make_move' | 'leave_queue' | 'battle_move' | 'battle_switch';
   data?: any;
 }
 
 export interface ServerMessage {
-  type: 'team_generated' | 'game_found' | 'battle_update' | 'error' | 'game_ended';
+  type: 'team_generated' | 'game_found' | 'battle_update' | 'error' | 'game_ended' | 'battle_started' | 'battle_request' | 'battle_ended';
   data?: any;
 }
 
@@ -47,4 +47,35 @@ export interface GameFoundResponse {
 export interface BattleUpdateResponse {
   messages: string[];
   gameState: any;
+}
+
+export interface BattleMoveRequest {
+  type: 'move' | 'switch';
+  moveSlot?: number; // 1-4 for moves
+  pokemonSlot?: number; // 1-6 for pokemon
+}
+
+export interface BattleState {
+  turn: number;
+  weather?: string;
+  players: {
+    p1: BattlePlayerState;
+    p2: BattlePlayerState;
+  };
+}
+
+export interface BattlePlayerState {
+  name: string;
+  team: PokemonBattleState[];
+  activePokemon: number; // Index of active pokemon
+}
+
+export interface PokemonBattleState {
+  species: string;
+  level: number;
+  hp: number;
+  maxhp: number;
+  status?: string;
+  moves: string[];
+  item?: string;
 }

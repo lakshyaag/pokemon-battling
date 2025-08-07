@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import type { PokemonSet, ServerMessage } from './types';
 import { useWebSocket } from './hooks/useWebSocket';
 import { GameLobby } from './components/GameLobby';
+import { BattleInterface } from './components/BattleInterface';
+import { BattleProvider, useBattle } from './contexts/BattleContext';
 import './App.css';
 
 // WebSocket URL - adjust for your environment
@@ -9,12 +11,12 @@ const WS_URL = import.meta.env.DEV
   ? 'ws://localhost:8080/ws'
   : `ws://${window.location.host}/ws`;
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [team, setTeam] = useState<PokemonSet[]>([]);
   const [isInQueue, setIsInQueue] = useState(false);
   const [gameState, setGameState] = useState<'lobby' | 'in_game'>('lobby');
   const [messages, setMessages] = useState<string[]>([]);
-  const [currentGame, setCurrentGame] = useState<any>(null);
+  const { dispatch } = useBattle();
 
   const handleMessage = useCallback((message: ServerMessage) => {
     console.log('Received message:', message);
@@ -40,16 +42,38 @@ export const App: React.FC = () => {
         break;
 
       case 'game_found':
+        console.log('Game found data:', message.data);
         setIsInQueue(false);
         setGameState('in_game');
-        setCurrentGame(message.data);
+        dispatch({ type: 'SET_GAME_DATA', payload: message.data });
         setMessages(prev => [...prev, `Battle found! vs ${message.data?.opponent}`]);
+        break;
+
+      case 'battle_update':
+        console.log('Received battle_update:', message.data);
+        if (message.data?.lines) {
+          dispatch({ type: 'ADD_BATTLE_UPDATES', payload: message.data.lines });
+        }
+        if (message.data?.battleState) {
+          console.log('Setting battle state:', message.data.battleState);
+          dispatch({ type: 'SET_BATTLE_STATE', payload: message.data.battleState });
+        }
+        if (message.data?.yourSide) {
+          console.log('Setting player side:', message.data.yourSide);
+          dispatch({ type: 'SET_PLAYER_SIDE', payload: message.data.yourSide });
+        }
         break;
 
       case 'opponent_disconnected':
         setGameState('lobby');
-        setCurrentGame(null);
+        dispatch({ type: 'RESET_BATTLE' });
         setMessages(prev => [...prev, message.data?.message || 'Opponent disconnected']);
+        break;
+
+      case 'battle_ended':
+        setGameState('lobby');
+        dispatch({ type: 'RESET_BATTLE' });
+        setMessages(prev => [...prev, message.data?.message || 'Battle ended']);
         break;
 
       case 'error':
@@ -68,6 +92,7 @@ export const App: React.FC = () => {
       setMessages(prev => [...prev, 'Disconnected from server']);
       setIsInQueue(false);
       setGameState('lobby');
+      dispatch({ type: 'RESET_BATTLE' });
     },
     onError: (error) => setMessages(prev => [...prev, `Connection error: ${error}`])
   });
@@ -82,20 +107,13 @@ export const App: React.FC = () => {
           onSendMessage={sendMessage}
         />
       ) : (
-        <div className="battle-view">
-          <h2>Battle in Progress</h2>
-          <p>vs {currentGame?.opponent}</p>
-          <p>Battle system coming soon...</p>
-          <button 
-            onClick={() => {
-              setGameState('lobby');
-              setCurrentGame(null);
-            }}
-            className="btn btn-secondary"
-          >
-            Return to Lobby (Forfeit)
-          </button>
-        </div>
+        <BattleInterface
+          onSendMessage={sendMessage}
+          onReturnToLobby={() => {
+            setGameState('lobby');
+            dispatch({ type: 'RESET_BATTLE' });
+          }}
+        />
       )}
 
       <div className="message-log">
@@ -109,5 +127,13 @@ export const App: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <BattleProvider>
+      <AppContent />
+    </BattleProvider>
   );
 };
