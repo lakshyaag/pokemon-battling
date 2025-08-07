@@ -10,30 +10,37 @@ export class SocketHandler {
   private clients: Map<string, { ws: WebSocket; player: Player }> = new Map();
 
   constructor() {
-    this.teamGenerator = new TeamGenerator();
-    this.gameManager = new GameManager();
+    try {
+      this.teamGenerator = new TeamGenerator();
+      this.gameManager = new GameManager();
+      console.log('SocketHandler initialized successfully');
+    } catch (error) {
+      console.error('Error initializing SocketHandler:', error);
+      throw error;
+    }
   }
 
   /**
    * Handle new WebSocket connection
    */
   handleConnection(ws: WebSocket): void {
-    const playerId = uuidv4();
-    
-    const player: Player = {
-      id: playerId,
-      name: `Player_${playerId.slice(0, 8)}`
-    };
+    try {
+      const playerId = uuidv4();
+      
+      const player: Player = {
+        id: playerId,
+        name: `Player_${playerId.slice(0, 8)}`
+      };
 
-    this.clients.set(playerId, { ws, player });
-    
-    console.log(`Player connected: ${player.name} (${playerId})`);
+      this.clients.set(playerId, { ws, player });
+      
+      console.log(`Player connected: ${player.name} (${playerId})`);
 
-    // Send welcome message
-    this.sendMessage(playerId, {
-      type: 'connection_established',
-      data: { playerId, playerName: player.name }
-    });
+      // Send welcome message
+      this.sendMessage(playerId, {
+        type: 'connection_established',
+        data: { playerId, playerName: player.name }
+      });
 
     // Set up message handler
     ws.on('message', (data) => {
@@ -51,9 +58,13 @@ export class SocketHandler {
       this.handleDisconnection(playerId);
     });
 
-    ws.on('error', (error) => {
-      console.error(`WebSocket error for player ${playerId}:`, error);
-    });
+      ws.on('error', (error) => {
+        console.error(`WebSocket error for player ${playerId}:`, error);
+      });
+    } catch (error) {
+      console.error('Error handling WebSocket connection:', error);
+      ws.close(1011, 'Server error');
+    }
   }
 
   /**

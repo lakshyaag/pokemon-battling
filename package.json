@@ -5,11 +5,11 @@
     "main": "index.js",
     "scripts": {
         "dev": "concurrently \"bun run server:dev\" \"bun run client:dev\"",
-        "server:dev": "cd server && bun run dev",
-        "client:dev": "cd client && bun run dev",
-        "install:all": "bun install && cd server && bun install && cd ../client && bun install",
-        "build": "cd client && bun run build",
-        "start": "cd server && bun start"
+        "server:dev": "cd server; bun run dev",
+        "client:dev": "cd client; bun run dev",
+        "install:all": "bun install; cd server; bun install; cd ../client; bun install",
+        "build": "cd client; bun run build",
+        "start": "cd server; bun start"
     },
     "keywords": [
         "pokemon",
