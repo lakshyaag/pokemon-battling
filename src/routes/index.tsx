@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import logo from '../logo.svg'
+import { Link } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -33,6 +34,9 @@ function App() {
         >
           Learn TanStack
         </a>
+        <div className="mt-6 flex gap-4">
+          <Link to="/queue" className="text-white underline">Open Queue</Link>
+        </div>
       </header>
     </div>
   )
