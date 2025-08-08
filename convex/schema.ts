@@ -2,13 +2,6 @@ import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
 export default defineSchema({
-  // Demo content from scaffold; keep for reference pages
-  products: defineTable({
-    title: v.string(),
-    imageId: v.string(),
-    price: v.number(),
-  }),
-
   // Users of the app
   users: defineTable({
     name: v.string(),

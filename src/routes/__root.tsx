@@ -1,26 +1,15 @@
-import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+import { Outlet, createRootRoute } from '@tanstack/react-router'
 
 import Header from '../components/Header'
 
 import ConvexProvider from '../integrations/convex/provider.tsx'
 
-import TanStackQueryLayout from '../integrations/tanstack-query/layout.tsx'
-
-import type { QueryClient } from '@tanstack/react-query'
-
-interface MyRouterContext {
-  queryClient: QueryClient
-}
-
-export const Route = createRootRouteWithContext<MyRouterContext>()({
+export const Route = createRootRoute({
   component: () => (
     <>
       <ConvexProvider>
         <Header />
         <Outlet />
-        <TanStackRouterDevtools />
-        <TanStackQueryLayout />
       </ConvexProvider>
     </>
   ),

@@ -13,7 +13,6 @@
     "check": "biome check"
   },
   "dependencies": {
-    "@convex-dev/react-query": "0.0.0-alpha.8",
     "@pkmn/client": "^0.7.0",
     "@pkmn/data": "^0.9.38",
     "@pkmn/dex": "^0.9.38",
