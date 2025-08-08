@@ -153,12 +153,17 @@ async function simulateFromSeedAndChoices(args: {
   })()
 
   // Start battle and set players
-  await streams.omniscient.write(`>start ${JSON.stringify(spec)}\n` + `>player p1 ${JSON.stringify(p1spec)}\n` + `>player p2 ${JSON.stringify(p2spec)}`)
+  await streams.omniscient.write(
+    `>start ${JSON.stringify(spec)}\n` +
+      `>player p1 ${JSON.stringify(p1spec)}\n` +
+      `>player p2 ${JSON.stringify(p2spec)}\n`
+  )
 
-  // Feed choices by side
+  // Feed choices by side in order
   const choicesByTurn = choices.sort((a, b) => a.turn - b.turn)
   for (const c of choicesByTurn) {
-    await streams[c.side].write(c.choice)
+    const stream = c.side === 'p1' ? streams.p1 : streams.p2
+    await stream.write(c.choice + '\n')
   }
 
   await streams.omniscient.writeEnd()

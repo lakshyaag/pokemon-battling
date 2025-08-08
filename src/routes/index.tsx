@@ -1,6 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
-import logo from '../logo.svg'
-import { Link } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -8,36 +6,13 @@ export const Route = createFileRoute('/')({
 
 function App() {
   return (
-    <div className="text-center">
-      <header className="min-h-screen flex flex-col items-center justify-center bg-[#282c34] text-white text-[calc(10px+2vmin)]">
-        <img
-          src={logo}
-          className="h-[40vmin] pointer-events-none animate-[spin_20s_linear_infinite]"
-          alt="logo"
-        />
-        <p>
-          Edit <code>src/routes/index.tsx</code> and save to reload.
-        </p>
-        <a
-          className="text-[#61dafb] hover:underline"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-        <a
-          className="text-[#61dafb] hover:underline"
-          href="https://tanstack.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn TanStack
-        </a>
-        <div className="mt-6 flex gap-4">
-          <Link to="/queue" className="text-white underline">Open Queue</Link>
-        </div>
-      </header>
+    <div className="p-6 space-y-4">
+      <h1 className="text-2xl font-bold">Pokémon Battling</h1>
+      <p className="text-gray-700">Queue up to start a Gen 9 Random Battle and open the battle page to play.</p>
+      <div className="flex gap-3">
+        <Link to="/queue" className="underline text-blue-600">Open Queue</Link>
+        <Link to="/battle/$id" params={{ id: 'demo' as any }} className="underline text-blue-600">Battle (Enter a real id after matching)</Link>
+      </div>
     </div>
   )
 }
