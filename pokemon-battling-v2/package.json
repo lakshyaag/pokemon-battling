@@ -1,0 +1,19 @@
+{
+  "name": "pokemon-battling-v2",
+  "version": "1.0.0",
+  "description": "Multiplayer Pokemon battling application",
+  "private": true,
+  "scripts": {
+    "install:all": "cd server && bun install && cd ../client && bun install",
+    "build:server": "cd server && bun run build",
+    "build:client": "cd client && bun run build",
+    "build:all": "bun run build:server && bun run build:client",
+    "dev:server": "cd server && bun run dev",
+    "dev:client": "cd client && bun run dev",
+    "verify": "bun run build:all && echo '✅ Both server and client compiled successfully!'"
+  },
+  "workspaces": [
+    "server",
+    "client"
+  ]
+}
